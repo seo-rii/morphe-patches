@@ -34,7 +34,7 @@ jobs:
 
       - name: Setup WireGuard NDK
         run: |
-          sdkmanager --install 'ndk;28.2.13676358' 'platforms;android-36' 'build-tools;36.0.0'
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'ndk;28.2.13676358' 'platforms;android-36' 'build-tools;36.0.0'
           printf 'ANDROID_NDK_HOME=%s/ndk/28.2.13676358\n' "$ANDROID_HOME" >> "$GITHUB_ENV"
 
       - name: Test WireGuard native engine
