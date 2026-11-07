@@ -192,6 +192,38 @@ To sign in, press continue below"</string>
     <string name="morphe_skip_silence_minimum_pause_title">Minimum pause length</string>
     <string name="morphe_skip_silence_minimum_pause_summary">Only pauses at least this long are shortened. Takes effect when the next video starts</string>
 
+    <!-- misc.wireguard.wireGuardProxyPatch -->
+    <string name="morphe_wireguard_settings_title">WireGuard proxy</string>
+    <string name="morphe_wireguard_settings_summary">Import a WireGuard profile for app-only proxying without a system VPN</string>
+    <string name="morphe_wireguard_intro">Routes supported app requests through an imported WireGuard profile. Requires exactly one peer, a numeric IP endpoint, and a DNS server covered by AllowedIPs. No system VPN is created. This is not an operating-system kill switch; requests outside the patched network paths are not covered. QUIC is disabled while enabled.</string>
+    <string name="morphe_wireguard_profile_present">An encrypted profile is stored on this device.</string>
+    <string name="morphe_wireguard_profile_missing">No WireGuard profile has been imported.</string>
+    <string name="morphe_wireguard_state_disabled">Current process: WireGuard routing is disabled.</string>
+    <string name="morphe_wireguard_state_pending">Current process: enabled; local proxy starts on the first supported network request.</string>
+    <string name="morphe_wireguard_state_ready">Current process: local proxy ready. Remote handshake and Internet access have not been verified.</string>
+    <string name="morphe_wireguard_state_blocked">Current process: WireGuard could not start. Intercepted requests are blocked without direct fallback.</string>
+    <string name="morphe_wireguard_saved_enabled">Saved mode for the next app start: enabled.</string>
+    <string name="morphe_wireguard_saved_disabled">Saved mode for the next app start: disabled.</string>
+    <string name="morphe_wireguard_restart_needed">Restart the app to apply changes. Existing network engines keep their current routing until restart.</string>
+    <string name="morphe_wireguard_import">Import .conf file</string>
+    <string name="morphe_wireguard_enable">Enable and restart</string>
+    <string name="morphe_wireguard_disable">Disable and restart</string>
+    <string name="morphe_wireguard_remove">Remove profile</string>
+    <string name="morphe_wireguard_restart">Restart app</string>
+    <string name="morphe_wireguard_busy">Working…</string>
+    <string name="morphe_wireguard_imported">Profile saved. Importing alone does not enable routing. Restart to use a replacement profile.</string>
+    <string name="morphe_wireguard_import_failed">Could not load this profile. Use a supported UTF-8 WireGuard .conf file of at most 64 KiB, and make sure the native library is included.</string>
+    <string name="morphe_wireguard_missing_picker">No system document picker is available.</string>
+    <string name="morphe_wireguard_unavailable">WireGuard proxy is not included in this APK. Repatch with the WireGuard proxy patch.</string>
+    <string name="morphe_wireguard_enable_confirm">Enable app-only WireGuard routing and restart? Supported requests will not fall back to a direct connection when the tunnel fails.</string>
+    <string name="morphe_wireguard_disable_confirm">Disable WireGuard routing after restarting? The app will return to its normal or configured external-proxy connection.</string>
+    <string name="morphe_wireguard_remove_confirm">Remove the encrypted profile and its encryption key, disable WireGuard routing, and restart? The source file you imported is not deleted.</string>
+    <string name="morphe_wireguard_apply_restart">Apply and restart</string>
+    <string name="morphe_wireguard_remove_failed">Could not completely remove the stored profile. Check app storage and try again.</string>
+    <string name="morphe_wireguard_restart_failed">Restart is required. Close the app completely and open it again.</string>
+    <string name="morphe_wireguard_licenses">Open source licenses</string>
+    <string name="morphe_wireguard_licenses_failed">Could not load open source licenses.</string>
+
     <!-- misc.proxy.networkProxyPatch -->
     <string name="morphe_proxy_screen_title">Network proxy</string>
     <string name="morphe_proxy_screen_summary">Route supported network requests through a proxy</string>

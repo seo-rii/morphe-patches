@@ -61,6 +61,73 @@ dependencies {
 }
 
 tasks {
+    val buildWireGuardNative = register<Exec>("buildWireGuardNative") {
+        description = "Builds both pinned Android WireGuard payloads from source"
+        group = "build"
+        workingDir(rootProject.projectDir)
+        commandLine("bash", rootProject.file("scripts/build-wireguard-android.sh"))
+        // The standalone script can build to an isolated directory for comparison.
+        // Gradle always builds exactly the files declared below and packaged into the bundle.
+        environment("WIREGUARD_NATIVE_OUTPUT", rootProject.file("native/wireguard/build/android"))
+        inputs.files(rootProject.fileTree("native/wireguard") {
+            exclude("build/**", "vendor/**", ".build/**")
+        })
+        inputs.file(rootProject.file("scripts/build-wireguard-android.sh"))
+        inputs.property("goBinary", providers.environmentVariable("WIREGUARD_GO_BIN").getOrElse("go"))
+        inputs.property("ndkDirectory", providers.environmentVariable("ANDROID_NDK_HOME")
+            .orElse(providers.environmentVariable("ANDROID_NDK_ROOT")).getOrElse("sdk-default"))
+        outputs.files(listOf("arm64-v8a", "x86_64").map { abi ->
+            rootProject.file("native/wireguard/build/android/$abi/libmorphewireguard.so")
+        })
+    }
+
+    val compileWireGuardBundleCheck = register<JavaCompile>("compileWireGuardBundleCheck") {
+        description = "Compiles the no-APK WireGuard bundle loader smoke test"
+        source(rootProject.file("tests/wireguard-bundle/WireGuardBundleSmoke.java"))
+        classpath = configurations.runtimeClasspath.get()
+        destinationDirectory.set(layout.buildDirectory.dir("wireguard-bundle-check/classes"))
+        options.release.set(17)
+    }
+
+    register<JavaExec>("verifyWireGuardBundleLoading") {
+        description = "Loads the built bundle through Morphe without patching an APK"
+        group = "verification"
+        dependsOn("buildAndroid", compileWireGuardBundleCheck)
+        // Do not include main.output: the WireGuard patch must load from the archive itself.
+        classpath = files(compileWireGuardBundleCheck.flatMap { it.destinationDirectory },
+                configurations.runtimeClasspath)
+        mainClass.set("WireGuardBundleSmoke")
+        doFirst {
+            setArgs(listOf(project.tasks.named("jar", Jar::class.java)
+                    .get().archiveFile.get().asFile.absolutePath))
+        }
+    }
+
+    processResources {
+        dependsOn(buildWireGuardNative)
+        from(rootProject.layout.projectDirectory.dir("native/wireguard/build/android")) {
+            into("wireguard")
+            include("*/libmorphewireguard.so")
+        }
+        from(rootProject.layout.projectDirectory.file("NOTICE")) {
+            into("wireguard/licenses")
+            rename { "MORPHE-NOTICE.txt" }
+        }
+        from(rootProject.layout.projectDirectory.file("LICENSE")) {
+            into("wireguard/licenses")
+            rename { "MORPHE-LICENSE.txt" }
+        }
+        from(rootProject.layout.projectDirectory.dir("native/wireguard/licenses")) {
+            into("wireguard/licenses/dependencies")
+        }
+        doLast {
+            val licenses = destinationDir.resolve("wireguard/licenses")
+            val paths = licenses.walkTopDown().filter { it.isFile && it.name != "INDEX" }
+                .map { it.relativeTo(licenses).invariantSeparatorsPath }.sorted().toList()
+            licenses.resolve("INDEX").writeText(paths.joinToString("\n", postfix = "\n"))
+        }
+    }
+
     test {
         useJUnitPlatform()
         dependsOn(":extensions:youtube:generateReleaseProto", ":extensions:youtube:compileReleaseJavaWithJavac")
