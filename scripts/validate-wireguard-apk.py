@@ -9,6 +9,7 @@ unsigned to avoid creating or handling signing credentials.
 """
 
 import argparse
+import copy
 from datetime import datetime, timezone
 import hashlib
 import importlib.util
@@ -180,6 +181,40 @@ def marker_is_true(disassembly):
             "WireGuard inclusion marker is not an unconditional true return")
 
 
+def network_hook_calls(lines):
+    """Count injected invocations from app classes, excluding extension self-calls."""
+    methods = ("applyProxyOptions", "recordCronetEngine", "setMainCronetEngine", "initialize")
+    calls = {name: 0 for name in methods}
+    classes = {name: set() for name in methods}
+    current_class = b""
+    for line in lines:
+        descriptor = re.search(rb"Class descriptor\s*: '([^']+)'", line)
+        if descriptor:
+            current_class = descriptor[1]
+        if not current_class or current_class.startswith(b"Lapp/morphe/extension/"):
+            continue
+        invocation = re.search(rb"\|[0-9a-f]+: invoke-static(?:/range)?\s+[^\n]*"
+                               rb"Lapp/morphe/extension/shared/patches/NetworkProxyPatch;\."
+                               rb"(applyProxyOptions|recordCronetEngine|setMainCronetEngine|initialize):", line)
+        if invocation:
+            name = invocation[1].decode("ascii")
+            calls[name] += 1
+            classes[name].add(current_class.decode("ascii"))
+    return calls, classes
+
+
+def dex_network_hook_calls(dexdump, dex):
+    with tempfile.TemporaryFile() as errors:
+        process = subprocess.Popen([str(dexdump), "-d", str(dex)], stdout=subprocess.PIPE, stderr=errors)
+        try:
+            result = network_hook_calls(process.stdout)
+        finally:
+            process.stdout.close()
+            exit_code = process.wait()
+        require(exit_code == 0, f"dexdump failed while inspecting app hooks: exit {exit_code}")
+        return result
+
+
 def bundle_helpers():
     spec = importlib.util.spec_from_file_location("wireguard_bundle_inspector",
                                                  REPO / "scripts/verify-wireguard-bundle.py")
@@ -193,6 +228,140 @@ def native_abis(names):
             if (match := re.fullmatch(r"lib/([^/]+)/[^/]+\.so", name))}
 
 
+def parse_abis(text):
+    values = text.split(",")
+    if not values or len(values) != len(set(values)) or not set(values) <= SUPPORTED_ABIS:
+        raise argparse.ArgumentTypeError("ABIs must be a unique comma-list of arm64-v8a,x86_64")
+    return set(values)
+
+
+def select_abis(available, requested=None, allow_universal=False):
+    require(available, "Stock APK has no complete native architecture")
+    chosen = set(available if requested is None else requested)
+    require(chosen and chosen <= SUPPORTED_ABIS, "Selected architectures must be supported 64-bit ABIs")
+    require(chosen <= available, "Selected architecture is absent from the original APK")
+    require(allow_universal or available <= SUPPORTED_ABIS,
+            "Stock APK contains unsupported architectures; explicit derived-input mode is required")
+    return chosen
+
+
+def signer_digests(output):
+    # Modern APKs rotate certificates by Android SDK range. Source-stamp and
+    # public-key digests are different identities and must not satisfy this check.
+    selector = r"(?:#\d+|\(minSdkVersion=\d+, maxSdkVersion=\d+\))"
+    matches = re.findall(r"(?m)^Signer (" + selector
+                         + r") certificate SHA-256 digest: ([0-9a-fA-F:]+)$", output)
+    require(matches and len(matches) == len({number for number, _ in matches}),
+            "Source APK signer report is missing or ambiguous")
+    digests = {digest.replace(":", "").lower() for _, digest in matches}
+    require(all(re.fullmatch(r"[0-9a-f]{64}", digest) for digest in digests),
+            "Source APK certificate fingerprint is malformed")
+    return digests
+
+
+def source_signers(package):
+    app = {"com.google.android.youtube": "youtube",
+           "com.google.android.apps.youtube.music": "music"}.get(package)
+    require(app, "Source APK package is unsupported")
+    relative = f"patches/src/main/kotlin/app/morphe/patches/{app}/shared/Constants.kt"
+    declaration = re.search(r"\bsignatures\s*=\s*setOf\((.*?)\)",
+                            (REPO / relative).read_text(), re.DOTALL)
+    require(declaration is not None, "Cannot read upstream signer allowlist")
+    allowed = set(re.findall(r'"([0-9a-f]{64})"', declaration[1]))
+    require(allowed, "Upstream signer allowlist is empty")
+    return allowed, relative
+
+
+def verify_source(apk, build_tools, metadata):
+    with zipfile.ZipFile(apk) as archive:
+        check_zip(archive)
+    result = subprocess.run([str(build_tools / "apksigner"), "verify", "--verbose", "--print-certs",
+                             str(apk)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    require(result.returncode == 0, f"Original APK signature verification failed: exit {result.returncode}")
+    output = (result.stdout + result.stderr).decode("utf-8", errors="replace")
+    actual = signer_digests(output)
+    allowed, relative = source_signers(metadata["package"])
+    require(actual <= allowed, "Original APK signer is not in upstream's Google certificate allowlist")
+    return {"status": "PASS", "sha256": sha256(apk), "metadata": metadata,
+            "zip_crc": "PASS", "apksigner_exit_code": result.returncode,
+            "certificate_sha256": sorted(actual), "signer_allowlist_source": relative,
+            "signer_allowlist_source_sha256": sha256(REPO / relative),
+            "signature_report": output}
+
+
+def signature_entry(name):
+    upper = name.upper()
+    if not upper.startswith("META-INF/") or upper.count("/") != 1:
+        return False
+    basename = upper[len("META-INF/"):]
+    return basename == "MANIFEST.MF" or basename.startswith("SIG-") or basename.endswith(
+        (".SF", ".RSA", ".DSA", ".EC"))
+
+
+def has_apk_signing_block(path):
+    with zipfile.ZipFile(path) as archive, path.open("rb") as stream:
+        if archive.start_dir < 24:
+            return False
+        stream.seek(archive.start_dir - 16)
+        return stream.read(16) == b"APK Sig Block 42"
+
+
+def derive_64bit_input(original, destination, requested, verified_source):
+    """Build an unsigned ABI-only fixture; never change the signed original."""
+    require(verified_source.get("status") == "PASS" and verified_source.get("zip_crc") == "PASS"
+            and verified_source.get("apksigner_exit_code") == 0
+            and verified_source.get("certificate_sha256"), "Verified original APK is required")
+    original_hash = sha256(original)
+    require(original_hash == verified_source.get("sha256"), "Verified source APK changed before derivation")
+    removed_native, removed_signatures, retained = [], [], {}
+    with zipfile.ZipFile(original) as source:
+        names = check_zip(source)
+        available = native_abis(names)
+        selected = select_abis(available, requested, allow_universal=True)
+        require(selected != available, "Derived mode must remove unselected native architectures")
+        with destination.open("xb") as output:
+            os.chmod(destination, 0o600)
+            with zipfile.ZipFile(output, "w") as derived:
+                for info in source.infolist():
+                    parts = info.filename.split("/")
+                    if parts[0] == "lib" and len(parts) > 1 and parts[1] and parts[1] not in selected:
+                        removed_native.append(info.filename)
+                        continue
+                    if signature_entry(info.filename):
+                        removed_signatures.append(info.filename)
+                        continue
+                    digest = hashlib.sha256()
+                    with source.open(info) as reader, derived.open(copy.copy(info), "w") as writer:
+                        for data in iter(lambda: reader.read(1024 * 1024), b""):
+                            digest.update(data)
+                            writer.write(data)
+                    retained[info.filename] = {"bytes": info.file_size, "sha256": digest.hexdigest()}
+    with zipfile.ZipFile(destination) as derived:
+        require(set(check_zip(derived)) == set(retained), "Derived APK entry set changed unexpectedly")
+        require(native_abis(derived.namelist()) == selected, "Derived APK architecture set is incorrect")
+        for name, expected in retained.items():
+            digest = hashlib.sha256()
+            with derived.open(name) as reader:
+                for data in iter(lambda: reader.read(1024 * 1024), b""):
+                    digest.update(data)
+            require(digest.hexdigest() == expected["sha256"], "Retained APK entry content changed")
+    require(not has_apk_signing_block(destination), "Derived APK unexpectedly retains a signing block")
+    require(sha256(original) == original_hash, "Original APK changed during derivation")
+    manifest = destination.with_suffix(".retained-entries.json")
+    write_report({"original_sha256": original_hash, "derived_sha256": sha256(destination),
+                  "retained_entries": retained}, manifest, print_output=False)
+    return {"input_kind": "unsigned-derived-64-bit-fixture", "original_sha256": original_hash,
+            "derived_sha256": sha256(destination), "original_abis": sorted(available),
+            "selected_abis": sorted(selected), "signature": "UNSIGNED; original Google signature removed",
+            "original_apk_signing_block_present": has_apk_signing_block(original),
+            "removed_native_entries": removed_native, "removed_signature_entries": removed_signatures,
+            "retained_entry_count": len(retained), "retained_entry_content_verified": True,
+            "retained_entry_manifest": str(manifest), "retained_entry_manifest_sha256": sha256(manifest),
+            "operation": "Remove unselected native directories and invalidated APK/JAR signature metadata; "
+                         "retain every other entry's uncompressed content unchanged",
+            "force_compatibility": False}
+
+
 def apk_metadata(aapt2, apk):
     badging = run_tool([aapt2, "dump", "badging", apk]).decode("utf-8")
     line = next((line for line in badging.splitlines() if line.startswith("package: ")), "")
@@ -203,7 +372,7 @@ def apk_metadata(aapt2, apk):
             "version_code": values.get("versionCode")}
 
 
-def inspect_apk(apk, stock, bundle_path, build_tools, readelf):
+def inspect_apk(apk, stock, bundle_path, build_tools, readelf, selected_abis=None):
     aapt2, dexdump = build_tools / "aapt2", build_tools / "dexdump"
     helpers = bundle_helpers()
     with zipfile.ZipFile(apk) as patched, zipfile.ZipFile(stock) as original, \
@@ -211,8 +380,8 @@ def inspect_apk(apk, stock, bundle_path, build_tools, readelf):
                 prefix="wireguard-apk-inspection-") as temporary:
         names, stock_names = check_zip(patched), check_zip(original)
         check_zip(bundle)
-        abis = native_abis(stock_names)
-        require(abis and abis <= SUPPORTED_ABIS, "Stock APK is not a complete supported 64-bit APK")
+        original_abis = native_abis(stock_names)
+        abis = select_abis(original_abis, selected_abis, allow_universal=selected_abis is not None)
         require(native_abis(names) == abis, "Patched APK architecture set differs from stock APK")
         native = {}
         for abi in sorted(abis):
@@ -247,6 +416,9 @@ def inspect_apk(apk, stock, bundle_path, build_tools, readelf):
             run_tool([aapt2, "dump", "resources", apk])), "Default English WireGuard resources missing")
 
         runtime = {}
+        network_calls = {name: 0 for name in
+                         ("applyProxyOptions", "recordCronetEngine", "setMainCronetEngine", "initialize")}
+        network_classes = {name: set() for name in network_calls}
         dex_names = sorted(name for name in names
                            if re.fullmatch(r"classes(?:[2-9]|[1-9][0-9]+)?\.dex", name))
         require(dex_names, "APK has no DEX files")
@@ -254,6 +426,10 @@ def inspect_apk(apk, stock, bundle_path, build_tools, readelf):
             dex = Path(temporary) / (str(index) + ".dex")
             dex.write_bytes(patched.read(name))
             classes = helpers.dex_classes(dexdump, dex)
+            calls, callers = dex_network_hook_calls(dexdump, dex)
+            for method in network_calls:
+                network_calls[method] += calls[method]
+                network_classes[method].update(callers[method])
             for key, value in classes.items():
                 if key.startswith(PACKAGE):
                     require(key not in runtime, "Duplicate WireGuard runtime class across DEX files")
@@ -263,6 +439,7 @@ def inspect_apk(apk, stock, bundle_path, build_tools, readelf):
         for name in ("ConfigText", "NativeTunnel", "WireGuardConfigStore", "WireGuardProxy",
                      "WireGuardPreference", "WireGuardSettingsActivity"):
             require(PACKAGE + name in runtime, f"APK runtime class missing: {name}")
+        require(all(network_calls.values()), "Network proxy hooks are missing from target app code")
         methods = runtime[PACKAGE + "NativeTunnel"].findall("method")
         for name, result_type, parameters in (
                 ("start", "int", ["java.lang.String"] * 3 + ["int"]),
@@ -279,20 +456,24 @@ def inspect_apk(apk, stock, bundle_path, build_tools, readelf):
     return {"status": "PASS", "apk_sha256": sha256(apk),
             "stock_sha256": sha256(stock), "bundle_sha256": sha256(bundle_path),
             "stock": apk_metadata(aapt2, stock), "patched": apk_metadata(aapt2, apk),
+            "original_abis": sorted(original_abis), "selected_abis": sorted(abis),
             "native_sha256": native, "license_files": len(paths),
+            "network_hook_calls_from_app_code": network_calls,
+            "network_hook_caller_classes": {name: sorted(values) for name, values in network_classes.items()},
             "default_english_resources": len(required_keys), "dex_files": len(dex_names),
             "wireguard_included_marker": True, "alignment": "PASS", "signature": "NOT CHECKED",
             "android_execution": "NOT RUN", "connectivity": "NOT RUN"}
 
 
-def write_report(report, path=None):
+def write_report(report, path=None, print_output=True):
     report["recorded_at"] = datetime.now(timezone.utc).isoformat()
     text = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if path:
         with path.open("x", encoding="utf-8") as output:
             os.chmod(path, 0o600)
             output.write(text)
-    print(text, end="")
+    if print_output:
+        print(text, end="")
 
 
 def prerequisites(args):
@@ -306,6 +487,10 @@ def prerequisites(args):
         executables.append(args.readelf)
     if args.mode == "matrix":
         executables.append(args.java)
+        if args.derive_64bit_input:
+            executables.append(args.build_tools / "apksigner")
+            if not (args.build_tools / "apksigner").is_file():
+                missing.append(str(args.build_tools / "apksigner"))
     for path in executables:
         if path.is_file() and not os.access(path, os.X_OK):
             missing.append(f"not executable: {path}")
@@ -354,8 +539,20 @@ def matrix(args):
         metadata = apk_metadata(args.build_tools / "aapt2", apk)
         require(metadata["package"] in APP_PACKAGES, "Target is neither stock YouTube nor Music")
         with zipfile.ZipFile(apk) as archive:
-            abis = native_abis(check_zip(archive))
-        require(abis and abis <= SUPPORTED_ABIS, f"Unsupported target architectures: {label}")
+            original_abis = native_abis(check_zip(archive))
+        abis = select_abis(original_abis, args.abis, allow_universal=args.derive_64bit_input)
+        patch_input, derivation, verification = apk, None, None
+        if args.derive_64bit_input:
+            input_directory = args.output_dir / (label + "-input")
+            input_directory.mkdir(mode=0o700)
+            verification = verify_source(apk, args.build_tools, metadata)
+            write_report(verification, input_directory / "source-verification.json", print_output=False)
+            if abis != original_abis:
+                patch_input = input_directory / "unsigned-derived64.apk"
+                derivation = derive_64bit_input(apk, patch_input, abis, verification)
+                require(apk_metadata(args.build_tools / "aapt2", patch_input) == metadata,
+                        "ABI-only derivation changed source package/version metadata")
+                write_report(derivation, input_directory / "derivation.json", print_output=False)
         for selection in (["focused", "defaults"] if args.default_selection else ["focused"]):
             directory = args.output_dir / (label + "-" + selection)
             directory.mkdir(mode=0o700)
@@ -365,9 +562,14 @@ def matrix(args):
                        "-t", str(directory / "scratch"), "-o", str(output), "-r", str(result)]
             if selection == "focused":
                 command += ["--exclusive", "-e", "WireGuard proxy (experimental)"]
-            command.append(str(apk))
+            command.append(str(patch_input))
             record = {"label": label, "selection": selection, "command": command,
-                      "stock_sha256": sha256(apk), "stock": metadata, "status": "FAIL"}
+                      "stock_sha256": sha256(apk), "stock": metadata, "status": "FAIL",
+                      "original_abis": sorted(original_abis), "selected_abis": sorted(abis),
+                      "patch_input": str(patch_input), "patch_input_sha256": sha256(patch_input),
+                      "input_kind": "unsigned-derived-64-bit-fixture" if derivation else "stock-original",
+                      "force_compatibility": False, "derivation": derivation,
+                      "original_signature_verification": verification or "NOT CHECKED"}
             log = directory / "desktop.log"
             with log.open("xb") as stream:
                 os.chmod(log, 0o600)
@@ -379,9 +581,11 @@ def matrix(args):
                 require(result.is_file(), "Desktop result report is missing")
                 desktop_report = json.loads(result.read_text())
                 check_desktop_result(desktop_report)
-                record["inspection"] = inspect_apk(output, apk, args.bundle, args.build_tools, args.readelf)
+                record["inspection"] = inspect_apk(output, apk, args.bundle, args.build_tools,
+                                                   args.readelf, abis)
                 require(record["inspection"]["bundle_sha256"] == report["bundle_sha256"]
-                        and record["inspection"]["stock_sha256"] == record["stock_sha256"],
+                        and record["inspection"]["stock_sha256"] == record["stock_sha256"]
+                        and sha256(patch_input) == record["patch_input_sha256"],
                         "Source APK or bundle changed during validation")
                 record["status"] = "PASS"
             except (OSError, RuntimeError, ValueError, KeyError, zipfile.BadZipFile,
@@ -404,6 +608,8 @@ def main():
         command.add_argument("--readelf", type=Path,
                              default=Path(value) if (value := shutil.which("llvm-readelf")
                                                       or shutil.which("readelf")) else None)
+        command.add_argument("--abis", type=parse_abis,
+                             help="Exact supported ABI subset to inspect/keep, e.g. arm64-v8a")
         if name == "inspect":
             command.add_argument("--apk", required=True, type=Path)
             command.add_argument("--stock-apk", required=True, type=Path)
@@ -415,7 +621,12 @@ def main():
             command.add_argument("--output-dir", required=True, type=Path)
             command.add_argument("--default-selection", action="store_true",
                                  help="Also patch with the complete normal default selection")
+            command.add_argument("--derive-64bit-input", action="store_true",
+                                 help="Verify original Google signature, then derive an unsigned ABI-only "
+                                      "fixture when filtering is needed; requires --abis")
     args = parser.parse_args()
+    if args.mode == "matrix" and args.derive_64bit_input and args.abis is None:
+        parser.error("--derive-64bit-input requires an explicit --abis selection")
     for key, value in vars(args).items():
         if isinstance(value, Path):
             setattr(args, key, value.expanduser().resolve())
@@ -428,7 +639,8 @@ def main():
             return 2
         if args.mode == "matrix":
             return matrix(args)
-        write_report(inspect_apk(args.apk, args.stock_apk, args.bundle, args.build_tools, args.readelf),
+        write_report(inspect_apk(args.apk, args.stock_apk, args.bundle, args.build_tools,
+                                 args.readelf, args.abis),
                      args.report)
         return 0
     except (OSError, RuntimeError, ValueError, KeyError, zipfile.BadZipFile,
