@@ -1,8 +1,13 @@
 # Device and target-version acceptance
 
-Status: **NOT RUN for this upstream port.** All expected outcomes below are
-**Expected results**, not observations. The author's successful real-device use
-of the original v2.1.1 release is recorded separately in [README.md](README.md).
+Status: target-app runtime cases below remain **NOT RUN**. APKPure host
+patching/inspection has now executed; its nine PASS/one FAIL matrix and explicit
+YouTube input-derivation limits are recorded in
+[apkpure-validation.md](apkpure-validation.md). Two bounded emulator attempts
+failed in the Android framework before any target app installation.
+All expected runtime outcomes below are **Expected results**, not observations.
+The author's successful real-device use of the original v2.1.1 release is
+recorded separately in [README.md](README.md).
 
 ## Matrix
 
@@ -33,6 +38,14 @@ Use complete APKs containing only `arm64-v8a` and/or `x86_64`, not a base split
 without native libraries or a 32-bit APK. Test a 64-bit physical device and, if
 available, x86_64 emulator; include the oldest relevant API level and a recent
 Android device with 16 KiB page size. Root-mount installation is unsupported.
+
+Desktop 2.1.1 applies `--striplibs` during resource encoding, after the WireGuard
+guard reads original ABI entries. That option alone does not make a universal
+APK acceptable. For host fingerprint/resource verification only, the wrapper's
+explicit `--derive-64bit-input --abis arm64-v8a` verifies the original Google
+signature and creates a separately labeled unsigned fixture with retained
+DEX/resources unchanged. Never report it as an untouched stock APK or relax the
+runtime ABI guard. The APKPure record documents the actual negative control.
 
 ## Reproducible patch preparation
 
@@ -81,6 +94,11 @@ The wrapper deliberately produces **unsigned APKs** and handles no signing keys.
 Sign a chosen result with the tester's existing local signing process before
 device installation, or use Desktop's normal signed command above. An unsigned
 artifact is not installable merely because static checks pass.
+
+For an explicitly derived host matrix, add
+`--derive-64bit-input --abis arm64-v8a`. Retain `source-verification.json`,
+`derivation.json` and the per-entry hash manifest with each result. No `-f` is
+added; the original package/version and internal version gates remain intact.
 
 Dependencies are included by the patch resolver. Repeat the latest recommended
 and latest experimental APK for each app with the normal default patch selection

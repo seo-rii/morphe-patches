@@ -4,6 +4,12 @@ This file separates new execution evidence, historical release documentation and
 unrun Android acceptance. Expected results are in
 [device-acceptance.md](device-acceptance.md).
 
+Follow-up APKPure execution is recorded in [apkpure-validation.md](apkpure-validation.md).
+Five acquired originals were signature-verified; the arm64 matrix had nine PASS
+and one FAIL across ten focused/default-selection cases. YouTube's universal
+originals required explicitly labeled unsigned 64-bit fixtures. Newest
+recommended YouTube 21.30.216 remains unavailable behind APKPure HTTP 403.
+
 ## Inputs
 
 Baseline: complete v2.1.1 release source and `.mpp`, verified against the SHA-256
@@ -56,11 +62,11 @@ commands below were executed using freshly fetched pinned public dependencies.
 | Morphe Desktop 2.1.1 metadata loading | PASS; `list-patches` loaded the newly built bundle and listed both patches as enabled by default. This is not `--validate` |
 | DEX/JNI/resource/native-notice bundle inspection | PASS; both patch DEX classes, shared/Music extension DEX, three JNI signatures, both exact native payloads, English resources and indexed notices. Music has 36 Requester calls and no direct URL connection/stream calls |
 | Dependency vulnerability scans | 38 module advisories / 1 imported Android package / 0 tool-reported reachable symbols; see [qualified analysis](dependency-audit.md). Not a clean module scan or safety proof |
-| APK validation-wrapper host parser/integrity tests | PASS: 20 fixtures; missing-input CLI emits NOT RUN and exits 2. Scoped manifest, translated-only resources, inclusion-marker, Desktop result integrity and unsafe ZIP/license paths checked; fixtures are not target APK validation |
+| APK validation-wrapper host parser/integrity tests | Initial suite: 20 fixtures passed. APKPure follow-up: 31 passed, adding signer rotation, ABI-only derivation/content preservation and target-app hook proofs. Missing inputs remain NOT RUN/exit 2 |
 | Android/ART JNI smoke | PASS: 19 checks, exit 0, isolated AOSP Android 11/API 30 x86_64 software emulator; native loading/start/auth/routing-rejection/stop/restart under shell UID. Local log: `~/logs/morphe-wireguard-android-jni-7t4s8xmy.log` |
-| Patched APK native/resources/manifest/signature inspection | NOT RUN; stock target APK needed |
-| Desktop `--validate` target matrix | NOT RUN; stock target APKs needed |
-| Android install/UI/import/handshake/playback | NOT RUN; stock target apps and controlled test peer needed |
+| Patched APK native/resources/manifest/signature inspection | PASS for nine successful arm64 cases and one extra x86_64 focused case; source Google signatures verified, patched outputs unsigned except one verified ephemeral test-signed x86_64 APK. See APKPure input/derivation scope |
+| Desktop `--validate` target matrix | PARTIAL: five focused cases passed; four default cases passed; older YouTube 20.51.39 default selection failed in unchanged Captions fingerprint code, reproduced with WireGuard disabled. Latest recommended YouTube 21.30.216 NOT RUN (APKPure 403) |
+| Android install/UI/import/handshake/playback | NOT RUN for target apps; two isolated TCG emulator attempts had framework ANRs/restarts before installation. No app result is inferred from those environment failures |
 | Android DNS/failure/network-transition/lifecycle/concurrency | NOT RUN; device/network evidence needed |
 
 For every completed build, record source commit or source manifest, tool versions,
@@ -169,7 +175,8 @@ They do not bypass APK/device testing.
 
 - Refresh `dev` comparison and preserve unrelated upstream changes.
 - Recheck source/artifact identifiers if implementation changes.
-- Obtain the declared target APKs and execute required Desktop validation.
+- Obtain YouTube 21.30.216 and complete the missing newest-recommended Desktop
+  validation. Keep the observed older-target Captions failure visible.
 - Record Android acceptance results; disclose every unrun row and uncovered path.
 - Review native notice distribution, dependency ownership and default selection
   with maintainers.

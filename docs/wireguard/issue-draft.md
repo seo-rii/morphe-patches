@@ -30,6 +30,15 @@ I have used v2.1.1 successfully on my Android device. That experience is separat
 from the build/automated results and is not a completed device/version/leak-test
 matrix for the new upstream port.
 
+The source port now also has actual Desktop `--validate`/APK inspection evidence
+using APKPure-sourced apps: three original arm64 Music versions and two explicitly
+ABI-filtered unsigned YouTube fixtures derived from verified Google-signed
+universal originals. Focused WireGuard cases passed. An older YouTube full-default
+Captions ambiguity remains, also reproduced with WireGuard disabled; the newest
+recommended YouTube download was blocked by APKPure 403. These are host checks,
+not Android playback/handshake/leak-test results. Exact limits and input hashes
+are in the contribution's `docs/wireguard/apkpure-validation.md`.
+
 I propose keeping small app-specific WireGuard patches depending on their
 existing Network proxy patches. This preserves working code, shares hooks and
 runtime, and keeps profile/key/native lifecycle concerns distinct from remote

@@ -76,17 +76,33 @@ Executed on 2026-11-07; exact commands, tool versions and limits are in
   final DEX/JNI/native/resources/notices inspection passed.
 - Android/ART JNI smoke: 19 checks passed on an isolated API 30 x86_64 emulator
   using shell `app_process`; this did not run a patched YouTube/Music app.
-- APK-wrapper parser/integrity tests: 20 host fixtures passed; no target APKs
-  were available for its real matrix path.
+- Initial APK-wrapper parser/integrity tests: 20 host fixtures passed before
+  the later APKPure acquisition and matrix described below.
+
+APKPure follow-up (2026-11-08 KST): five acquired originals passed actual Google
+signature/package/version/integrity checks. All five arm64 WireGuard-focused
+cases passed `--validate` and final APK inspection; four complete-default cases
+passed (Music 9.15.51/9.30.53/9.45.51 and YouTube 21.44.528). YouTube 20.51.39
+default selection failed in the unchanged Captions legacy authentication
+fingerprint with two matches; disabling WireGuard reproduced the failure.
+The matrix correctly exited 1 for its nine PASS/one FAIL result.
+
+YouTube inputs were explicitly derived unsigned 64-bit fixtures from verified
+universal originals with every retained DEX/resource entry unchanged; those
+original universal APKs are rejected by the existing guard even when Desktop
+`--striplibs` is supplied. Music used original signed arm64 inputs. No force,
+gate removal or validation bypass was used. The new verification suite has
+31 passing tests. [Full input hashes, scope and evidence](apkpure-validation.md).
 
 Unsigned preview artifact: `patches-2.3.0-wireguard-dev.mpp` (24,205,503 bytes),
 SHA-256 `fa272d0d6f49b0b65b6d252c353659a24318bac68fefdbb71ca43350702e2d94`.
 
-**Not run:** patching/installation of stock target APKs, Desktop `--validate`
-fingerprint matrix, target-app settings/import/handshake/playback/DNS/failure/
-handoff/concurrent-app acceptance. Original APKs and a controlled test peer are
-needed. No target-app runtime result is established by host JNI tests, the
-archive loader, metadata listing, DEX inspection or shell-UID Android JNI smoke.
+**Not run:** newest-recommended YouTube 21.30.216 (APKPure HTTP 403), target-app
+installation/settings/import/handshake/playback/DNS/failure/handoff/concurrent-app
+acceptance. Two isolated emulator attempts had framework ANRs/restarts before
+target app installation. A stable Android environment and controlled test peer
+are needed. No target-app runtime result is established by host JNI tests,
+APK validation, metadata listing or shell-UID Android JNI smoke.
 
 - [ ] Tested on both the **minimum** and **maximum** supported versions
 - [ ] Tested on **experimental** supported versions (Optional)

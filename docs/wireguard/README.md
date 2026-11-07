@@ -12,6 +12,7 @@ Review material:
 - [Source build and CI](build.md)
 - [Security, dependency and license review](security.md)
 - [Executed validation and remaining checks](validation.md)
+- [APKPure target APK validation and controls](apkpure-validation.md)
 - [Device and app-version acceptance procedure](device-acceptance.md)
 - [Feature request draft](issue-draft.md)
 - [Pull request draft](pr-draft.md)
