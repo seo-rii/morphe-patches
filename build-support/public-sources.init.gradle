@@ -1,0 +1,24 @@
+// Use public source builds instead of credential-protected binary repositories.
+// Task-local only: this does not change the Morphe application source checkout.
+gradle.beforeSettings { settings ->
+    if (settings.settingsDir.name == 'morphe-wireguard') {
+        def pluginDirectory = new File(settings.settingsDir.parentFile, 'morphe-patches-gradle-plugin')
+        settings.pluginManagement {
+            includeBuild(pluginDirectory.absolutePath)
+        }
+    }
+}
+
+gradle.settingsEvaluated { settings ->
+    settings.dependencyResolutionManagement.repositories.removeAll { repository ->
+        repository.hasProperty('url') && repository.url?.host == 'maven.pkg.github.com'
+    }
+}
+
+gradle.beforeProject { project ->
+    project.repositories.all { repository ->
+        if (repository.hasProperty('url') && repository.url?.host == 'maven.pkg.github.com') {
+            project.repositories.remove(repository)
+        }
+    }
+}

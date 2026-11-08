@@ -20,6 +20,7 @@ configure<LibraryExtension> {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     implementation(libs.morphe.extensions.library)
     implementation(libs.androidx.javascriptengine)
     implementation(libs.gson)

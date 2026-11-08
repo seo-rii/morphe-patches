@@ -1,0 +1,3 @@
+/build/
+# Generated with `go mod vendor`; included separately in the delivery archive.
+/vendor/

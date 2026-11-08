@@ -1,0 +1,33 @@
+diff --git a/src/main/kotlin/app/morphe/patches/gradle/SettingsPlugin.kt b/src/main/kotlin/app/morphe/patches/gradle/SettingsPlugin.kt
+index 416d113..270f56e 100644
+--- a/src/main/kotlin/app/morphe/patches/gradle/SettingsPlugin.kt
++++ b/src/main/kotlin/app/morphe/patches/gradle/SettingsPlugin.kt
+@@ -40,14 +40,20 @@ abstract class SettingsPlugin @Inject constructor(
+             mavenCentral()
+             google()
+             maven { repository -> repository.url = URI("https://jitpack.io") }
+-            maven { repository ->
+-                // A repository must be specified. "registry" is a dummy.
+-                repository.url = URI("https://maven.pkg.github.com/MorpheApp/registry")
+-                repository.credentials {
+-                    it.username = providers.gradleProperty("gpr.user")
+-                        .orElse(System.getenv("GITHUB_ACTOR")).get()
+-                    it.password = providers.gradleProperty("gpr.key")
+-                        .orElse(System.getenv("GITHUB_TOKEN")).get()
++            val githubUser = providers.gradleProperty("gpr.user")
++                .orElse(providers.environmentVariable("GITHUB_ACTOR")).orNull
++            val githubToken = providers.gradleProperty("gpr.key")
++                .orElse(providers.environmentVariable("GITHUB_TOKEN")).orNull
++            // Task-local public-source build: included builds provide Morphe dependencies.
++            // Omit the authenticated repository when no credentials are configured.
++            if (!githubUser.isNullOrBlank() && !githubToken.isNullOrBlank()) {
++                maven { repository ->
++                    // A repository must be specified. "registry" is a dummy.
++                    repository.url = URI("https://maven.pkg.github.com/MorpheApp/registry")
++                    repository.credentials {
++                        it.username = githubUser
++                        it.password = githubToken
++                    }
+                 }
+             }
+         }

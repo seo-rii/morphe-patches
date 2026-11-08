@@ -27,7 +27,6 @@ import org.json.JSONObject;
 import java.io.OutputStream;
 import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -533,7 +532,7 @@ public final class EnableAudioVideoSwitchPatch {
     }
 
     private static JSONObject requestJson(String url, String searchQuery) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+        HttpURLConnection connection = Requester.openConnection(url);
         connection.setConnectTimeout(10_000);
         connection.setReadTimeout(15_000);
 

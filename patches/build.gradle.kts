@@ -4,10 +4,10 @@ group = "app.morphe"
 
 patches {
     about {
-        name = "Morphe Patches"
-        description = "Patches for Morphe"
-        source = "git@github.com:MorpheApp/morphe-patches.git"
-        author = "MorpheApp"
+        name = "YouTube + Music WireGuard preview (unofficial)"
+        description = "Experimental local fork of Morphe Patches; includes opt-in WireGuard proxies for YouTube and YouTube Music"
+        source = "Local source archive; see README-WIREGUARD.md for the upstream revision"
+        author = "Local prototype; upstream contributions by MorpheApp"
         contact = "na"
         website = "https://morphe.software"
         license = "GNU General Public License v3.0, with additional GPL section 7 requirements"
@@ -61,6 +61,49 @@ dependencies {
 }
 
 tasks {
+    val compileWireGuardBundleCheck = register<JavaCompile>("compileWireGuardBundleCheck") {
+        description = "Compiles the no-APK WireGuard bundle loader smoke test"
+        source(rootProject.file("tests/wireguard-bundle/WireGuardBundleSmoke.java"))
+        classpath = configurations.runtimeClasspath.get()
+        destinationDirectory.set(layout.buildDirectory.dir("wireguard-bundle-check/classes"))
+        options.release.set(17)
+    }
+
+    register<JavaExec>("verifyWireGuardBundleLoading") {
+        description = "Loads the built bundle through Morphe without patching an APK"
+        group = "verification"
+        dependsOn("buildAndroid", compileWireGuardBundleCheck)
+        // Do not include main.output: the WireGuard patch must load from the archive itself.
+        classpath = files(compileWireGuardBundleCheck.flatMap { it.destinationDirectory },
+                configurations.runtimeClasspath)
+        mainClass.set("WireGuardBundleSmoke")
+        doFirst {
+            setArgs(listOf(project.tasks.named("jar", Jar::class.java)
+                    .get().archiveFile.get().asFile.absolutePath))
+        }
+    }
+
+    processResources {
+        // Native builds are explicit: ordinary upstream patch builds need no Go or NDK.
+        // The experimental patch refuses to run if its ABI payload is absent.
+        from(rootProject.layout.projectDirectory.dir("native/wireguard/build/android")) {
+            into("wireguard")
+            include("*/libmorphewireguard.so")
+        }
+        from(rootProject.layout.projectDirectory.file("NOTICE")) {
+            into("wireguard/licenses")
+            rename { "MORPHE-NOTICE.txt" }
+        }
+        from(rootProject.layout.projectDirectory.file("LICENSE")) {
+            into("wireguard/licenses")
+            rename { "MORPHE-LICENSE.txt" }
+        }
+        from(rootProject.layout.projectDirectory.dir("native/wireguard/vendor")) {
+            into("wireguard/licenses/dependencies")
+            include("**/LICENSE", "**/LICENSE.*", "**/NOTICE", "**/NOTICE.*", "**/PATENTS")
+        }
+    }
+
     test {
         useJUnitPlatform()
         dependsOn(":extensions:youtube:generateReleaseProto", ":extensions:youtube:compileReleaseJavaWithJavac")

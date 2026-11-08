@@ -38,6 +38,7 @@ import app.morphe.extension.shared.requests.CronetTransport;
 import app.morphe.extension.shared.requests.Requester;
 import app.morphe.extension.shared.requests.proxy.PlaintextHttpURLConnection;
 import app.morphe.extension.shared.requests.proxy.ProxyFallbackHttpURLConnection;
+import app.morphe.extension.shared.wireguard.WireGuardProxy;
 
 @SuppressWarnings("unused")
 public final class NetworkProxyPatch {
@@ -88,7 +89,8 @@ public final class NetworkProxyPatch {
         initialize();
         PROXY_OPTIONS_APPLIED_ON_CURRENT_THREAD.remove();
 
-        if (!PROXY_ENABLED.get()) {
+        final boolean wireGuard = WireGuardProxy.isEnabled();
+        if (!wireGuard && !PROXY_ENABLED.get()) {
             return;
         }
 
@@ -96,8 +98,15 @@ public final class NetworkProxyPatch {
             ProxyConfig config = getProxyConfig();
 
             if (!config.isValid()) {
+                if (wireGuard) throw new IllegalStateException("Invalid WireGuard proxy endpoint");
                 Logger.printException(() -> "Ignoring invalid proxy settings: " + config.host + ":" + config.port);
                 return;
+            }
+
+            if (wireGuard) {
+                // The local CONNECT proxy transports TCP, not QUIC/UDP. Do not rely on a
+                // separately configurable QUIC toggle for the WireGuard routing boundary.
+                builder.enableQuic(false);
             }
 
             final int scheme = config.httpsProxy
@@ -110,6 +119,12 @@ public final class NetworkProxyPatch {
             PROXY_OPTIONS_APPLIED_ON_CURRENT_THREAD.set(true);
         } catch (Throwable ex) {
             PROXY_OPTIONS_APPLIED_ON_CURRENT_THREAD.remove();
+            if (wireGuard) {
+                Logger.printException(() -> "WireGuard proxy options could not be applied; stopping engine creation");
+                // The generic proxy patch is fail-open on configuration errors. WireGuard
+                // cannot silently keep an unproxied builder after it has been enabled.
+                throw new IllegalStateException("WireGuard proxy could not be applied");
+            }
             Logger.printException(() -> "applyProxyOptions failure", ex);
         }
     }
@@ -159,7 +174,7 @@ public final class NetworkProxyPatch {
             throw new IOException("Unsupported URL protocol: " + protocol);
         }
 
-        if (!PROXY_ENABLED.get()) {
+        if (!WireGuardProxy.isEnabled() && !PROXY_ENABLED.get()) {
             return CronetTransport.openConnection(url, false, true);
         }
 
@@ -169,7 +184,8 @@ public final class NetworkProxyPatch {
         }
 
         // Plain HTTP does not use CONNECT, so proxy authentication needs an explicit header.
-        if (httpTarget && !config.httpsProxy && PROXY_AUTH_ENABLED.get()) {
+        if (httpTarget && !config.httpsProxy
+                && (WireGuardProxy.isEnabled() || PROXY_AUTH_ENABLED.get())) {
             return openAuthenticatedHttpProxyConnection(url, config);
         }
 
@@ -221,6 +237,10 @@ public final class NetworkProxyPatch {
     }
 
     private static ProxyConfig getProxyConfig() {
+        if (WireGuardProxy.isEnabled()) {
+            WireGuardProxy.Endpoint endpoint = WireGuardProxy.endpoint();
+            return new ProxyConfig(endpoint.host, endpoint.port, false, false);
+        }
         return new ProxyConfig(
                 PROXY_HOST.get().trim(),
                 PROXY_PORT.get(),
@@ -242,6 +262,9 @@ public final class NetworkProxyPatch {
     }
 
     private static String getProxyAuthorizationHeader() {
+        if (WireGuardProxy.isEnabled()) {
+            return WireGuardProxy.endpoint().authorization;
+        }
         if (!PROXY_AUTH_ENABLED.get()) {
             return null;
         }
