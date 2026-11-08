@@ -49,6 +49,16 @@ setup being tested.
   and Keystore entry are removed, routing is disabled, and the source document
   selected in the picker is left untouched.
 
+- [ ] **NOT YET RUN:** Compare the settings theme, toolbar, Back button and preference
+  rows with the app's existing Morphe pages. Rotate during picker and background
+  operations; cancel enable/remove confirmations and confirm the saved mode is unchanged.
+- [ ] **NOT YET RUN:** Import profiles using `PersistentKeepalive = off` and bare
+  numeric IPv4/IPv6 `Address`/`AllowedIPs`. Confirm bare routes remain single-host
+  routes. Check distinct file-access, encoding/size, validation, native-loading,
+  secure-save and stored-load diagnostics without profile values or URI/key leaks.
+  Expected result: a rejected import leaves the previous encrypted profile intact
+  and does not enable routing or start a tunnel.
+
 ## 3. Cronet proxy authentication and playback
 
 - [ ] **NOT YET RUN:** Use test-only instrumentation that records callback counts

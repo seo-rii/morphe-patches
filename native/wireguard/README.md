@@ -38,6 +38,9 @@ Exactly one `[Interface]` and one `[Peer]` are accepted. Core fields:
 - Interface: `PrivateKey`, `Address`, `DNS`, optional `MTU`, `ListenPort`.
 - Peer: `PublicKey`, `Endpoint`, `AllowedIPs`, optional `PresharedKey`,
   `PersistentKeepalive`.
+- Numeric `Address` and `AllowedIPs` entries may omit a mask: IPv4 uses `/32`
+  and IPv6 uses `/128`. A bare route denotes exactly one host.
+- `PersistentKeepalive` accepts seconds or case-insensitive `off` (zero).
 - Endpoint **must be numeric IPv4 or bracketed IPv6**, with a nonzero UDP port.
   Hostnames are deliberately rejected so startup cannot block on DNS or leak an
   endpoint-name lookup. Proton's numeric-endpoint exports fit this subset.
