@@ -196,7 +196,10 @@ func (e *Engine) forwardHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(response.StatusCode)
-	_, _ = io.Copy(&deadlineWriter{writer: w, controller: controller}, response.Body)
+	if _, err := io.Copy(&deadlineWriter{writer: w, controller: controller}, response.Body); err != nil {
+		// Headers may already be sent. Abort instead of completing a truncated response.
+		panic(http.ErrAbortHandler)
+	}
 }
 
 func stripHopHeaders(h http.Header) {

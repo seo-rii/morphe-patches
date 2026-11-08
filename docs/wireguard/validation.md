@@ -130,9 +130,44 @@ Native source-build outputs (same in both output directories):
 | arm64-v8a | 10,090,216 | `dad7e0389ac653d88af06761b5572499a781f9d0601cbecf272f3f08a0891581` |
 | x86_64 | 10,801,896 | `f98a8288f196864ae08989a40a89c637075317564450d34f4d7e3e62f29a0902` |
 
-The production Go/C engine and module pins are unchanged from the release.
-Native bytes differ from v2.1.1 because of deterministic compiler/build-ID flags;
-they are newly built source artifacts, not copied release binaries.
+For the pre-review build recorded above, the production Go/C engine and module
+pins were unchanged from the release. Those native bytes differ from v2.1.1
+because of deterministic compiler/build-ID flags; they are newly built source
+artifacts, not copied release binaries.
+
+## PR review follow-up (2026-11-08)
+
+The review found that the plaintext HTTP proxy discarded response-body copy
+errors. An origin closing a chunked response without its terminating chunk
+could therefore produce a successful, truncated client response. The proxy now
+aborts the downstream response with `http.ErrAbortHandler` on a copy error;
+deferred upstream cleanup still runs. This is a focused change to `proxy.go`,
+with no dependency-pin, JNI, routing or CONNECT implementation changes.
+
+The new `TestProxyResponseBodyCompletion` uses an encrypted in-memory WireGuard
+peer and eight cases: HTTP/HTTPS, complete/truncated chunk framing, and small/
+streamed bodies. Before the fix, the two truncated HTTP cases failed while the
+six controls passed. After the fix, all eight passed, including ten consecutive
+runs under `-race`. The full `go test -race -count=1 ./...` and `go vet ./...`
+passed with Go 1.26.10; the rebuilt host JNI smoke passed all 31 checks.
+
+The incremental Gradle source build passed in 1m12s (6 tasks executed, 269
+up-to-date). Both Android ABIs were rebuilt and checked for ELF protections,
+16 KiB LOAD alignment and JNI exports. The real Morphe loader again discovered
+203 patches and both default-selected WireGuard patches. Final bundle
+inspection passed for native payloads, DEX/JNI, routing, resources and notices.
+Local build log: `~/logs/morphe-wireguard-http-fix-bundle-qh4fg_0g.log`, exit 0.
+
+| Follow-up artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| arm64-v8a | 10,090,248 | `6bb1fdc3d350556dae72c532d9e2363a69bfc5a0a21c0f99ddc29705e86ce4cb` |
+| x86_64 | 10,801,928 | `5d6aff73d632d23cb8e65ab9337c13a5cbfad1394310690f8efeff7518e56e70` |
+| `patches-2.3.0-wireguard-dev.mpp` | 24,205,410 | `b3b69ab2cf654618f2a323680a86d5ae3efa264f267ab7db16a6beffbe927bf4` |
+
+The earlier APKPure matrix, Android JNI execution, reproducibility comparison
+and earlier artifact hashes describe the pre-review build. The APK matrix,
+Android execution and reproducibility comparison have not been rerun for this
+correction. Target-app Android acceptance remains unrun.
 
 ## Reproduction commands
 
