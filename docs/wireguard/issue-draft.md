@@ -34,10 +34,16 @@ The source port now also has actual Desktop `--validate`/APK inspection evidence
 using APKPure-sourced apps: three original arm64 Music versions and two explicitly
 ABI-filtered unsigned YouTube fixtures derived from verified Google-signed
 universal originals. Focused WireGuard cases passed. An older YouTube full-default
-Captions ambiguity remains, also reproduced with WireGuard disabled; the newest
-recommended YouTube download was blocked by APKPure 403. These are host checks,
-not Android playback/handshake/leak-test results. Exact limits and input hashes
-are in the contribution's `docs/wireguard/apkpure-validation.md`.
+Captions ambiguity remains, also reproduced with WireGuard disabled. APKPure
+access for the newest recommended YouTube 21.30.216 remained blocked; the author
+later supplied a separately verified APKMirror original. Focused and normal-default
+`--validate` plus both final APK inspections passed with matrix exit 0 using the
+reviewed `bf67c82f2` runtime bundle. The verification CLI preserves NDK readelf's
+executable alias and has 33 passing Python tests;
+the older APKPure cases remain results for their earlier bundle. These are host
+checks, not Android playback/handshake/leak-test results.
+The historical APKPure results and separate uploaded-input record are in
+`docs/wireguard/apkpure-validation.md` and `docs/wireguard/validation.md`.
 
 I propose keeping small app-specific WireGuard patches depending on their
 existing Network proxy patches. This preserves working code, shares hooks and

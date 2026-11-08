@@ -1,4 +1,4 @@
-# Pull request draft (not published)
+# Upstream pull request draft (not submitted)
 
 Title: `feat(YouTube / Music): Add experimental app-local WireGuard proxy`
 
@@ -59,7 +59,7 @@ claim that all required dependency modules are free of advisories.
 
 ### Test results
 
-Executed on 2026-11-07; exact commands, tool versions and limits are in
+Initial checks executed on 2026-11-07; exact commands, tool versions and limits are in
 [validation.md](validation.md) and [build.md](build.md):
 
 - Pristine release baseline: Gradle 5 Kotlin + 8 Java tests, native race suite and
@@ -91,16 +91,31 @@ YouTube inputs were explicitly derived unsigned 64-bit fixtures from verified
 universal originals with every retained DEX/resource entry unchanged; those
 original universal APKs are rejected by the existing guard even when Desktop
 `--striplibs` is supplied. Music used original signed arm64 inputs. No force,
-gate removal or validation bypass was used. The new verification suite has
-31 passing tests. [Full input hashes, scope and evidence](apkpure-validation.md).
+gate removal or validation bypass was used. At that point the verification suite
+had 31 passing tests. [Full input hashes, scope and evidence](apkpure-validation.md).
 
-Unsigned preview artifact: `patches-2.3.0-wireguard-dev.mpp` (24,205,503 bytes),
+APKPure-matrix unsigned artifact: `patches-2.3.0-wireguard-dev.mpp` (24,205,503 bytes),
 SHA-256 `fa272d0d6f49b0b65b6d252c353659a24318bac68fefdbb71ca43350702e2d94`.
 
-**Not run:** newest-recommended YouTube 21.30.216 (APKPure HTTP 403), target-app
-installation/settings/import/handshake/playback/DNS/failure/handoff/concurrent-app
-acceptance. Two isolated emulator attempts had framework ANRs/restarts before
-target app installation. A stable Android environment and controlled test peer
+The subsequent runtime fix (`bf67c82f2`) propagates interrupted plaintext HTTP
+responses. Eight encrypted-tunnel HTTP/HTTPS regression cases, native race/vet,
+host JNI and both ABI/bundle builds passed. Its 24,205,410-byte unsigned bundle
+has SHA-256 `b3b69ab2cf654618f2a323680a86d5ae3efa264f267ab7db16a6beffbe927bf4`.
+The author then supplied the APKMirror YouTube 21.30.216 original after APKPure
+access remained blocked. Checker fix `3923ee3c6` preserves NDK readelf's multicall
+alias and passed both new CLI regressions and all 33 Python tests. The full run
+passed both focused (1 named patch,
+including dependencies) and normal-default (113 patches) Desktop `--validate`
+and final APK inspections, with matrix exit 0. Both patched outputs are unsigned
+arm64 APKs produced from an explicit ABI-only fixture of the verified universal
+original. Other APKPure-version results above remain evidence for the earlier
+bundle; they were not rerun with
+this correction. See the separate
+[uploaded-input record](validation.md#uploaded-apkmirror-original-follow-up-2026-11-08).
+
+**Not run:** target-app installation/settings/import/handshake/playback/DNS/
+failure/handoff/concurrent-app acceptance. Two isolated emulator attempts had
+framework ANRs/restarts before target app installation. A stable Android environment and controlled test peer
 are needed. No target-app runtime result is established by host JNI tests,
 APK validation, metadata listing or shell-UID Android JNI smoke.
 
@@ -117,7 +132,9 @@ using the author's earlier, unspecified v2.1.1 device report.
 
 ### Submission notes (remove before posting)
 
-No PR has been created. Complete the outstanding target-APK/device tests or
-explicitly agree their scope with maintainers, add public commit/artifact links
-after authorized publication, and obtain the author's approval before posting.
+No official upstream PR has been submitted. A
+[personal-fork draft PR](https://github.com/seo-rii/morphe-patches/pull/1) exists
+for review and CI. Complete the outstanding target-APK/device tests or explicitly
+agree their scope with maintainers, refresh tested commit/artifact links, and
+obtain the author's approval before posting to the official upstream.
 Keep upstream's three primary template sections above in the posted body.

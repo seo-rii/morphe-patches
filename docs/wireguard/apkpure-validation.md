@@ -5,8 +5,8 @@ Execution date: 2026-11-08 KST (2026-11-07 UTC). This extends the earlier
 patching. It does not turn the author's v2.1.1 device report into a new-port
 device acceptance result.
 
-The runtime/native implementation remains `b98219e90`, with Music transport
-prerequisite `f3877f7dd`. The bundle is the existing source-built
+This historical run used runtime/native implementation `b98219e90`, with Music
+transport prerequisite `f3877f7dd`. Its bundle was the existing source-built
 `patches-2.3.0-wireguard-dev.mpp`, SHA-256
 `fa272d0d6f49b0b65b6d252c353659a24318bac68fefdbb71ca43350702e2d94`.
 No new runtime code, native dependency version, version gate or bundle bytecode
@@ -42,7 +42,12 @@ Cloudflare HTTP 403/security-verification pages, including in ordinary Chromium.
 Other APKPure pages/downloads succeeded from the same environment. No CAPTCHA,
 login or alternate-site APK download was used. A candidate version code found
 in third-party search metadata was not treated as a verified APKPure input.
-This target remains **NOT RUN**; another version does not replace it.
+This target was **NOT RUN in this APKPure matrix**; another version did not
+replace it. The later author-uploaded APKMirror input and checker correction are
+recorded in a separate
+[follow-up](validation.md#uploaded-apkmirror-original-follow-up-2026-11-08).
+They do not change this run's nine PASS/one FAIL count or make the uploaded file
+an APKPure-sourced original.
 
 ## Universal originals and explicit derived inputs
 

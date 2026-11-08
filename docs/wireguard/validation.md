@@ -8,7 +8,9 @@ Follow-up APKPure execution is recorded in [apkpure-validation.md](apkpure-valid
 Five acquired originals were signature-verified; the arm64 matrix had nine PASS
 and one FAIL across ten focused/default-selection cases. YouTube's universal
 originals required explicitly labeled unsigned 64-bit fixtures. Newest
-recommended YouTube 21.30.216 remains unavailable behind APKPure HTTP 403.
+recommended YouTube 21.30.216 was unavailable from APKPure in that run. The author
+later supplied an APKMirror original for the separate
+[uploaded-APK follow-up](#uploaded-apkmirror-original-follow-up-2026-11-08).
 
 ## Inputs
 
@@ -41,9 +43,10 @@ checks as they complete; do not infer them from the old ZIP's reports.
 
 Implementation commits: `f3877f7dd` (Music transport substitutions) and
 `b98219e90` (WireGuard runtime/native/build/verification). The tested production
-sources match these commits. Later contribution documents do not change those
-inputs. GitHub Actions itself was not executed; the equivalent local build/test
-commands below were executed using freshly fetched pinned public dependencies.
+sources for these initial results match those commits. Contribution documents
+did not change those inputs. GitHub Actions had not yet been executed for this
+initial record; the equivalent local build/test commands below used freshly
+fetched pinned public dependencies. Later revisions are recorded separately.
 
 | Check | Status / evidence |
 | --- | --- |
@@ -65,7 +68,7 @@ commands below were executed using freshly fetched pinned public dependencies.
 | APK validation-wrapper host parser/integrity tests | Initial suite: 20 fixtures passed. APKPure follow-up: 31 passed, adding signer rotation, ABI-only derivation/content preservation and target-app hook proofs. Missing inputs remain NOT RUN/exit 2 |
 | Android/ART JNI smoke | PASS: 19 checks, exit 0, isolated AOSP Android 11/API 30 x86_64 software emulator; native loading/start/auth/routing-rejection/stop/restart under shell UID. Local log: `~/logs/morphe-wireguard-android-jni-7t4s8xmy.log` |
 | Patched APK native/resources/manifest/signature inspection | PASS for nine successful arm64 cases and one extra x86_64 focused case; source Google signatures verified, patched outputs unsigned except one verified ephemeral test-signed x86_64 APK. See APKPure input/derivation scope |
-| Desktop `--validate` target matrix | PARTIAL: five focused cases passed; four default cases passed; older YouTube 20.51.39 default selection failed in unchanged Captions fingerprint code, reproduced with WireGuard disabled. Latest recommended YouTube 21.30.216 NOT RUN (APKPure 403) |
+| Desktop `--validate` target matrix | Historical APKPure matrix PARTIAL: five focused cases passed; four default cases passed; older YouTube 20.51.39 default selection failed in unchanged Captions fingerprint code, reproduced with WireGuard disabled. YouTube 21.30.216 was then NOT RUN (APKPure 403); its later uploaded-input follow-up is recorded separately below |
 | Android install/UI/import/handshake/playback | NOT RUN for target apps; two isolated TCG emulator attempts had framework ANRs/restarts before installation. No app result is inferred from those environment failures |
 | Android DNS/failure/network-transition/lifecycle/concurrency | NOT RUN; device/network evidence needed |
 
@@ -165,9 +168,102 @@ Local build log: `~/logs/morphe-wireguard-http-fix-bundle-qh4fg_0g.log`, exit 0.
 | `patches-2.3.0-wireguard-dev.mpp` | 24,205,410 | `b3b69ab2cf654618f2a323680a86d5ae3efa264f267ab7db16a6beffbe927bf4` |
 
 The earlier APKPure matrix, Android JNI execution, reproducibility comparison
-and earlier artifact hashes describe the pre-review build. The APK matrix,
+and earlier artifact hashes describe the pre-review build. That complete matrix,
 Android execution and reproducibility comparison have not been rerun for this
-correction. Target-app Android acceptance remains unrun.
+correction. The uploaded-input check below is a separate target/version run.
+Target-app Android acceptance remains unrun.
+
+## Uploaded APKMirror original follow-up (2026-11-08)
+
+After APKPure access retries remained unsuccessful, the author supplied the
+standalone universal APK from the
+[APKMirror YouTube 21.30.216 release](https://www.apkmirror.com/apk/google-inc/youtube/youtube-21-30-216-release/).
+This is an author-uploaded input, not a successful APKPure download. Its
+198,948,665-byte size and SHA-256
+`3775a15129dcc4e5b80fc17b7e0841b7fdd1ca89a6e72baa798806f666c74d02`
+match the published APKMirror metadata. SDK `aapt2` confirms
+`com.google.android.youtube`, version `21.30.216`, version code `1561187872`,
+minSdk 29 and all four ABIs (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`).
+The original's ZIP integrity and both Android-version-scoped Google APK signers
+were verified against the upstream allowlist before deriving the input:
+
+| Signer SDK range | Certificate SHA-256 |
+| --- | --- |
+| API 24-32 | `3d7a1223019aa39d9ea0e3436ab7c0896bfb4fb679f4de5fe7c23f326c8f994a` |
+| API 33+ | `5aad2bee6db95d17e05a08d7d1e64c10a1511879154483916b6ae6c7fd9cb0c6` |
+
+The Source Stamp certificate is recorded separately and is not an APK signer
+allowlist input. The uploaded original and its stable snapshot remain unchanged.
+
+The runtime/bundle is `bf67c82f2`, including the reviewed HTTP truncation fix.
+The unsigned source-built `.mpp` is 24,205,410 bytes, SHA-256
+`b3b69ab2cf654618f2a323680a86d5ae3efa264f267ab7db16a6beffbe927bf4`.
+The checker source is `3923ee3c67ab098e539b83e6bfdd32a078d81e57`.
+The original universal APK is preserved. Explicit
+`--derive-64bit-input --abis arm64-v8a` produces a separately labeled unsigned
+fixture; every retained DEX/resource/manifest/native entry is checked for byte
+equality. No compatibility force, version-gate change or fingerprint relaxation
+is used. The fixture SHA-256 is
+`c18b272cc8c0b168aee3f8f504ab89f25a1a018bba6e6fb91b6de8d44530064a`;
+16,655 retained entries passed content verification.
+
+The first matrix attempt exited 1: Desktop `--validate` succeeded for focused
+selection (1 named patch) and complete defaults (113 patches), but both final
+inspections failed. The checker resolved NDK's `llvm-readelf` symlink to its
+`llvm-readobj` multicall target, changing the output format and falsely reporting
+a missing JNI export. The correction preserves the executable alias; it does
+not change a native payload or relax export validation. Two CLI regressions,
+covering inspect and matrix, failed before the correction and passed afterward;
+all 33 verification-script tests then passed.
+
+The corrected full matrix rerun passed with exit 0 using Desktop 2.1.1, Temurin
+21.0.13+9, SDK Build-Tools 36.0.0 and the NDK r28c `llvm-readelf` alias. Both
+Desktop `--validate` runs and both complete final APK inspections passed:
+
+| Selection | Applied patches | Desktop / inspection | DEX files | Unsigned APK bytes | APK SHA-256 |
+| --- | ---: | --- | ---: | ---: | --- |
+| WireGuard focused, including dependencies | 1 named patch | PASS / PASS | 12 | 116,110,326 | `185830f5fbeab5d87ddfef8212f38b07ea17e45e450a30bb803702177cf2b4af` |
+| Complete normal defaults | 113 | PASS / PASS | 15 | 122,514,880 | `e1a4b6811e24cfee0db8a474416c05a96c68c4a1164a97fea1f8c6420eb36dd5` |
+
+Both outputs contain the exact arm64 native payload from the bundle, SHA-256
+`6bb1fdc3d350556dae72c532d9e2363a69bfc5a0a21c0f99ddc29705e86ce4cb`.
+They passed ELF/JNI checks, DEX/JNI contracts, the true inclusion marker,
+30 English resource keys, 34 indexed notices, private settings Activity and
+manifest checks, and 16 KiB APK zip alignment. Calls from target-app code were
+found for `applyProxyOptions` (1), `recordCronetEngine` (1),
+`setMainCronetEngine` (1) and `initialize` (2).
+
+The local result directory is
+`morphe-patches/.git/wireguard-reference/apkmirror/matrix-youtube-max-arm64-r2`;
+it retains source verification, derivation/retained-entry manifests, Desktop
+results and per-APK inspection reports. Completed matrix log:
+`~/logs/morphe-wireguard-youtube-max-apkmirror-validate-r2-r_ibqi_1.log`, exit 0.
+The earlier failed R1 attempt remains recorded separately with exit 1.
+
+To reproduce from the project root, set `YOUTUBE_MAX_APK` to the unchanged
+uploaded original, `MORPHE_DESKTOP` to the Desktop 2.1.1 JAR,
+`JAVA_HOME`/`ANDROID_HOME` to the toolchains above and
+`WIREGUARD_VALIDATION_OUTPUT` to a new output directory. Confirm the original
+SHA-256 is `3775a15129dcc4e5b80fc17b7e0841b7fdd1ca89a6e72baa798806f666c74d02`
+before running:
+
+```sh
+sha256sum "$YOUTUBE_MAX_APK"
+python3 scripts/validate-wireguard-apk.py matrix \
+  --bundle patches/build/libs/patches-2.3.0-wireguard-dev.mpp \
+  --desktop "$MORPHE_DESKTOP" --java "$JAVA_HOME/bin/java" \
+  --build-tools "$ANDROID_HOME/build-tools/36.0.0" \
+  --readelf "$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+  --target "youtube-max=$YOUTUBE_MAX_APK" \
+  --output-dir "$WIREGUARD_VALIDATION_OUTPUT" \
+  --default-selection --derive-64bit-input --abis arm64-v8a
+```
+
+This is host patching/static inspection evidence for this one target and
+runtime bundle. It does not rerun the older APKPure versions with the current
+bundle. Outputs are unsigned. Android installation, UI, profile import,
+handshake, playback, DNS, failure/handoff and concurrent-app execution remain
+NOT RUN.
 
 ## Reproduction commands
 
@@ -210,8 +306,9 @@ They do not bypass APK/device testing.
 
 - Refresh `dev` comparison and preserve unrelated upstream changes.
 - Recheck source/artifact identifiers if implementation changes.
-- Obtain YouTube 21.30.216 and complete the missing newest-recommended Desktop
-  validation. Keep the observed older-target Captions failure visible.
+- Recheck required version cases when the final artifact changes; the current
+  bundle's uploaded-input run covers YouTube 21.30.216. Keep the observed
+  older-target Captions failure and other unrerun version cases visible.
 - Record Android acceptance results; disclose every unrun row and uncovered path.
 - Review native notice distribution, dependency ownership and default selection
   with maintainers.
