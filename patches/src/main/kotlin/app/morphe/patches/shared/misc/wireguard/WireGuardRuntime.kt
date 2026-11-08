@@ -79,7 +79,6 @@ internal fun installWireGuardRuntime(preferenceScreen: BasePreferenceScreen.Scre
             setAttribute("android:name", "app.morphe.extension.shared.wireguard.WireGuardSettingsActivity")
             setAttribute("android:exported", "false")
             setAttribute("android:excludeFromRecents", "true")
-            setAttribute("android:theme", "@android:style/Theme.Material")
             setAttribute("android:label", "@string/morphe_wireguard_settings_title")
         }
     }

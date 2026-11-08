@@ -195,6 +195,8 @@ To sign in, press continue below"</string>
     <!-- misc.wireguard.wireGuardProxyPatch -->
     <string name="morphe_wireguard_settings_title">WireGuard proxy</string>
     <string name="morphe_wireguard_settings_summary">Import a WireGuard profile for app-only proxying without a system VPN</string>
+    <string name="morphe_wireguard_enabled_title">Use WireGuard proxy</string>
+    <string name="morphe_wireguard_status_title">Current routing</string>
     <string name="morphe_wireguard_intro">Routes supported app requests through an imported WireGuard profile. Requires exactly one peer, a numeric IP endpoint, and a DNS server covered by AllowedIPs. No system VPN is created. This is not an operating-system kill switch; requests outside the patched network paths are not covered. QUIC is disabled while enabled.</string>
     <string name="morphe_wireguard_profile_present">An encrypted profile is stored on this device.</string>
     <string name="morphe_wireguard_profile_missing">No WireGuard profile has been imported.</string>
