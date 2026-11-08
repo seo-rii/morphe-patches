@@ -7,18 +7,23 @@ import static app.morphe.extension.shared.StringRef.str;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Fragment;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.preference.Preference;
+import android.preference.PreferenceFragment;
+import android.preference.PreferenceScreen;
+import android.preference.SwitchPreference;
 import android.view.View;
-import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.Toolbar;
 
 import androidx.annotation.Nullable;
 
@@ -32,63 +37,59 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import app.morphe.extension.shared.Logger;
+import app.morphe.extension.shared.ResourceType;
+import app.morphe.extension.shared.ResourceUtils;
 import app.morphe.extension.shared.Utils;
+import app.morphe.extension.shared.settings.BaseActivityHook;
 import app.morphe.extension.shared.settings.SharedYouTubeSettings;
+import app.morphe.extension.shared.settings.preference.ToolbarPreferenceFragment;
+import app.morphe.extension.shared.theme.ThemeUtils;
 
 /**
- * Minimal profile UI with no VpnService, storage permission, account login or secret export.
+ * Morphe preference UI with no VpnService, storage permission, account login or secret export.
  * The native backend is loaded only after an explicit import/enable or enabled network use.
  */
 @SuppressWarnings({"unused", "deprecation"})
-public final class WireGuardSettingsActivity extends Activity {
+public final class WireGuardSettingsActivity extends BaseActivityHook {
     private static final int IMPORT_REQUEST = 0x5747;
     private static final int PAGE_PADDING_DP = 20;
-    private static final int STATUS_TEXT_SP = 16;
     private static final String LICENSE_ASSET_PATH = "wireguard/licenses";
 
     // Executors create their first thread lazily, only after a user starts an operation.
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
-    private TextView status;
-    private Button importButton;
-    private Button toggleButton;
-    private Button removeButton;
-    private Button restartButton;
+    @Nullable
+    private SettingsFragment settingsFragment;
     private boolean busy;
 
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(BaseActivityHook.getAttachBaseContext(base));
+    }
+
+    @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        customizeActivityTheme(this);
         super.onCreate(savedInstanceState);
         setTitle(str("morphe_wireguard_settings_title"));
+        setContentView(getContentViewResourceId());
+        getWindow().getDecorView().setBackgroundColor(ThemeUtils.getAppBackgroundColor());
 
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        final int padding = Math.round(PAGE_PADDING_DP * getResources().getDisplayMetrics().density);
-        content.setPadding(padding, padding, padding, padding);
-        scroll.addView(content);
-
-        TextView introduction = new TextView(this);
-        introduction.setText(str("morphe_wireguard_intro"));
-        introduction.setTextSize(STATUS_TEXT_SP);
-        content.addView(introduction);
-
-        status = new TextView(this);
-        status.setTextSize(STATUS_TEXT_SP);
-        status.setPadding(0, padding, 0, padding);
-        content.addView(status);
-        importButton = button(content, "morphe_wireguard_import", view -> openPicker());
-        toggleButton = button(content, "morphe_wireguard_enable", view -> confirmToggle());
-        removeButton = button(content, "morphe_wireguard_remove", view -> confirmRemove());
-        restartButton = button(content, "morphe_wireguard_restart", view -> restart());
-        button(content, "morphe_wireguard_licenses", view -> showLicenses());
-        setContentView(scroll);
+        Fragment restored = getFragmentManager().findFragmentById(ID_MORPHE_SETTINGS_FRAGMENTS);
+        settingsFragment = restored instanceof SettingsFragment
+                ? (SettingsFragment) restored : new SettingsFragment();
+        createToolbar(this, settingsFragment);
+        if (!(restored instanceof SettingsFragment)) {
+            getFragmentManager().beginTransaction()
+                    .replace(ID_MORPHE_SETTINGS_FRAGMENTS, settingsFragment)
+                    .commit();
+        }
         refreshState();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (status != null) refreshState();
+        refreshState();
     }
 
     @Override
@@ -97,41 +98,49 @@ public final class WireGuardSettingsActivity extends Activity {
         super.onDestroy();
     }
 
-    private Button button(LinearLayout content, String textKey, View.OnClickListener listener) {
-        Button button = new Button(this);
-        button.setText(str(textKey));
-        button.setFilterTouchesWhenObscured(true);
-        button.setOnClickListener(listener);
-        content.addView(button);
-        return button;
+    @Override
+    protected void customizeActivityTheme(Activity activity) {
+        // Reuse the themes selected by the existing Morphe settings hooks.
+        final int musicTheme = ResourceUtils.getIdentifier(
+                ResourceType.STYLE, "Theme.Morphe.YouTubeMusic.Settings");
+        if (musicTheme != 0) {
+            Utils.setIsDarkModeEnabled(true);
+            activity.setTheme(musicTheme);
+        } else {
+            activity.setTheme(ResourceUtils.getIdentifierOrThrow(ResourceType.STYLE,
+                    Utils.isDarkModeEnabled() ? "Theme.YouTube.Settings.Dark" : "Theme.YouTube.Settings"));
+        }
+    }
+
+    @Override
+    protected int getToolbarBackgroundColor() {
+        return ThemeUtils.getAppBackgroundColor();
+    }
+
+    @Override
+    protected Drawable getNavigationIcon() {
+        return ToolbarPreferenceFragment.getBackButtonDrawable();
+    }
+
+    @Override
+    protected View.OnClickListener getNavigationClickListener(Activity activity) {
+        return view -> activity.finish();
+    }
+
+    @Override
+    protected void onPostToolbarSetup(Activity activity, Toolbar toolbar, PreferenceFragment fragment) {
+        toolbar.setTitle(str("morphe_wireguard_settings_title"));
+        toolbar.setFilterTouchesWhenObscured(true);
+        ToolbarPreferenceFragment.addToolbarButton(toolbar, "morphe_settings_screen_00_about",
+                str("morphe_settings_screen_info_title"), () -> new AlertDialog.Builder(this)
+                        .setTitle(str("morphe_wireguard_settings_title"))
+                        .setMessage(str("morphe_wireguard_intro"))
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show());
     }
 
     private void refreshState() {
-        final boolean available = WireGuardProxy.isPatchIncluded();
-        final boolean hasProfile = WireGuardConfigStore.hasProfile(this);
-        final boolean savedEnabled = SharedYouTubeSettings.WIREGUARD_ENABLED.get();
-        String stateKey = switch (WireGuardProxy.state()) {
-            case DISABLED -> "morphe_wireguard_state_disabled";
-            case NOT_STARTED -> "morphe_wireguard_state_pending";
-            case READY -> "morphe_wireguard_state_ready";
-            case BLOCKED -> "morphe_wireguard_state_blocked";
-        };
-        String text = str(hasProfile ? "morphe_wireguard_profile_present"
-                : "morphe_wireguard_profile_missing") + "\n\n" + str(stateKey)
-                + "\n\n" + str(savedEnabled ? "morphe_wireguard_saved_enabled"
-                : "morphe_wireguard_saved_disabled");
-        if (WireGuardProxy.isRestartRequired()) {
-            text += "\n\n" + str("morphe_wireguard_restart_needed");
-        }
-        if (!available) text = str("morphe_wireguard_unavailable");
-        if (busy) text += "\n\n" + str("morphe_wireguard_busy");
-        status.setText(text);
-        toggleButton.setText(str(savedEnabled ? "morphe_wireguard_disable"
-                : "morphe_wireguard_enable"));
-        importButton.setEnabled(available && !busy);
-        toggleButton.setEnabled(available && !busy && (hasProfile || savedEnabled));
-        removeButton.setEnabled(available && !busy && hasProfile);
-        restartButton.setEnabled(!busy);
+        if (settingsFragment != null) settingsFragment.refreshState(this);
     }
 
     private void openPicker() {
@@ -279,6 +288,132 @@ public final class WireGuardSettingsActivity extends Activity {
 
     private void toast(String key) {
         Toast.makeText(this, str(key), Toast.LENGTH_LONG).show();
+    }
+
+    /** Framework-restorable preference list; profile operations remain owned by the Activity. */
+    public static final class SettingsFragment extends PreferenceFragment {
+        @Nullable
+        private RoutingSwitchPreference enabled;
+        @Nullable
+        private Preference status;
+        @Nullable
+        private Preference importProfile;
+        @Nullable
+        private Preference removeProfile;
+        @Nullable
+        private Preference restartApp;
+        @Nullable
+        private Preference licenses;
+
+        public SettingsFragment() {
+        }
+
+        @Override
+        public void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            WireGuardSettingsActivity activity = (WireGuardSettingsActivity) getActivity();
+            activity.settingsFragment = this;
+            PreferenceScreen screen = getPreferenceManager().createPreferenceScreen(activity);
+            screen.setOrderingAsAdded(true);
+
+            enabled = new RoutingSwitchPreference(activity);
+            enabled.setTitle(str("morphe_wireguard_enabled_title"));
+            enabled.setOnPreferenceChangeListener((preference, value) -> {
+                activity.confirmToggle();
+                // Only validation and the confirmation handler may persist this setting.
+                return false;
+            });
+            screen.addPreference(enabled);
+
+            status = new ActionPreference(activity);
+            status.setTitle(str("morphe_wireguard_status_title"));
+            status.setSelectable(false);
+            screen.addPreference(status);
+
+            importProfile = action(screen, activity, "morphe_wireguard_import", activity::openPicker);
+            removeProfile = action(screen, activity, "morphe_wireguard_remove", activity::confirmRemove);
+            restartApp = action(screen, activity, "morphe_wireguard_restart", activity::restart);
+            licenses = action(screen, activity, "morphe_wireguard_licenses", activity::showLicenses);
+            setPreferenceScreen(screen);
+            refreshState(activity);
+        }
+
+        @Override
+        public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
+            super.onViewCreated(view, savedInstanceState);
+            view.setBackgroundColor(ThemeUtils.getAppBackgroundColor());
+            view.setFilterTouchesWhenObscured(true);
+            View list = view.findViewById(android.R.id.list);
+            if (list != null) list.setFilterTouchesWhenObscured(true);
+        }
+
+        private static Preference action(PreferenceScreen screen, Context context, String titleKey,
+                                         Runnable onClick) {
+            Preference preference = new ActionPreference(context);
+            preference.setTitle(str(titleKey));
+            preference.setOnPreferenceClickListener(clicked -> {
+                onClick.run();
+                return true;
+            });
+            screen.addPreference(preference);
+            return preference;
+        }
+
+        private void refreshState(WireGuardSettingsActivity activity) {
+            if (enabled == null || status == null || importProfile == null
+                    || removeProfile == null || restartApp == null || licenses == null) return;
+            final boolean available = WireGuardProxy.isPatchIncluded();
+            final boolean hasProfile = WireGuardConfigStore.hasProfile(activity);
+            final boolean savedEnabled = SharedYouTubeSettings.WIREGUARD_ENABLED.get();
+            String stateKey = switch (WireGuardProxy.state()) {
+                case DISABLED -> "morphe_wireguard_state_disabled";
+                case NOT_STARTED -> "morphe_wireguard_state_pending";
+                case READY -> "morphe_wireguard_state_ready";
+                case BLOCKED -> "morphe_wireguard_state_blocked";
+            };
+            String state = str(available ? stateKey : "morphe_wireguard_unavailable");
+            if (activity.busy) state += "\n\n" + str("morphe_wireguard_busy");
+            status.setSummary(state);
+            enabled.setChecked(savedEnabled);
+            enabled.setSummary(str(savedEnabled ? "morphe_wireguard_saved_enabled"
+                    : "morphe_wireguard_saved_disabled"));
+            importProfile.setSummary(str(hasProfile ? "morphe_wireguard_profile_present"
+                    : "morphe_wireguard_profile_missing"));
+            restartApp.setSummary(WireGuardProxy.isRestartRequired()
+                    ? str("morphe_wireguard_restart_needed") : null);
+
+            enabled.setEnabled(available && !activity.busy && (hasProfile || savedEnabled));
+            importProfile.setEnabled(available && !activity.busy);
+            removeProfile.setEnabled(available && !activity.busy && hasProfile);
+            restartApp.setEnabled(!activity.busy);
+            licenses.setEnabled(available && !activity.busy);
+        }
+    }
+
+    private static final class ActionPreference extends Preference {
+        ActionPreference(Context context) {
+            super(context);
+            setPersistent(false);
+        }
+
+        @Override
+        protected void onBindView(View view) {
+            super.onBindView(view);
+            view.setFilterTouchesWhenObscured(true);
+        }
+    }
+
+    private static final class RoutingSwitchPreference extends SwitchPreference {
+        RoutingSwitchPreference(Context context) {
+            super(context);
+            setPersistent(false);
+        }
+
+        @Override
+        protected void onBindView(View view) {
+            super.onBindView(view);
+            view.setFilterTouchesWhenObscured(true);
+        }
     }
 
     @FunctionalInterface
