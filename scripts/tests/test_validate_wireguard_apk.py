@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import warnings
 import zipfile
 
@@ -142,6 +143,57 @@ class InputIntegrityTest(unittest.TestCase):
       () (file) other.xml
 """
         self.assertEqual(INSPECTOR.default_string_keys(output), {"morphe_wireguard_english"})
+
+
+class ExecutableInvocationTest(unittest.TestCase):
+    def check_multicall_readelf(self, mode):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            tool = directory / "llvm-readobj"
+            tool.write_text("#!/bin/sh\n"
+                            "case \"$0\" in\n"
+                            "  */llvm-readelf) printf 'GNU symbol table\\n' ;;\n"
+                            "  *) printf 'DynamicSymbols: []\\n' ;;\n"
+                            "esac\n")
+            tool.chmod(0o755)
+            readelf = directory / "llvm-readelf"
+            readelf.symlink_to(tool.name)
+            self.assertEqual(INSPECTOR.run_tool([tool, "--dyn-syms"]), b"DynamicSymbols: []\n")
+            formats = []
+
+            def inspect_boundary(apk, stock, bundle, build_tools, executable, abis):
+                formats.append(INSPECTOR.run_tool([executable, "--dyn-syms"]))
+                return {"status": "PASS"}
+
+            def matrix_boundary(args):
+                inspect_boundary(None, None, None, None, args.readelf, None)
+                return 0
+
+            command = [str(SCRIPT), mode, "--bundle", str(directory / "fixture.mpp"),
+                       "--build-tools", str(directory), "--readelf", str(readelf)]
+            if mode == "inspect":
+                command += ["--apk", str(directory / "patched.apk"),
+                            "--stock-apk", str(directory / "original.apk")]
+            else:
+                command += ["--desktop", str(directory / "desktop.jar"),
+                            "--java", sys.executable, "--target", "fixture=" + str(directory / "original.apk"),
+                            "--output-dir", str(directory / "runs")]
+            # Only CLI path handling and actual executable invocation are under test;
+            # APK/tool prerequisites and patching/inspection are separate boundaries.
+            with mock.patch.object(sys, "argv", command), \
+                    mock.patch.object(INSPECTOR, "prerequisites", return_value=[]), \
+                    mock.patch.object(INSPECTOR, "inspect_apk", side_effect=inspect_boundary), \
+                    mock.patch.object(INSPECTOR, "matrix", side_effect=matrix_boundary), \
+                    mock.patch.object(INSPECTOR, "write_report"):
+                self.assertEqual(INSPECTOR.main(), 0)
+            self.assertEqual(formats, [b"GNU symbol table\n"],
+                             "Resolving the tool symlink changes its multicall output format")
+
+    def test_inspect_preserves_multicall_readelf_invocation(self):
+        self.check_multicall_readelf("inspect")
+
+    def test_matrix_preserves_multicall_readelf_invocation(self):
+        self.check_multicall_readelf("matrix")
 
 
 class AbiDerivationIntegrityTest(unittest.TestCase):

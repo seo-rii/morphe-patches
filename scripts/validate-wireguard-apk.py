@@ -629,7 +629,9 @@ def main():
         parser.error("--derive-64bit-input requires an explicit --abis selection")
     for key, value in vars(args).items():
         if isinstance(value, Path):
-            setattr(args, key, value.expanduser().resolve())
+            path = value.expanduser()
+            # Keep argv[0]: llvm-readelf can be a multi-call alias of llvm-readobj.
+            setattr(args, key, path.absolute() if key == "readelf" else path.resolve())
     try:
         missing = prerequisites(args)
         if missing:
