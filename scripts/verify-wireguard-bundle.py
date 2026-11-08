@@ -136,7 +136,8 @@ def main():
         extension.write_bytes(bundle.read("extensions/shared-youtube.mpe"))
         classes = dex_classes(args.dexdump, extension)
         package = "app.morphe.extension.shared.wireguard."
-        for name in ("ConfigText", "NativeTunnel", "WireGuardConfigStore", "WireGuardProxy",
+        for name in ("ConfigText", "NativeTunnel", "NativeTunnel$InvalidProfileException",
+                     "ProfileOperations", "WireGuardConfigStore", "WireGuardProxy",
                      "WireGuardPreference", "WireGuardSettingsActivity"):
             require(package + name in classes, f"Runtime class missing from DEX: {name}")
         methods = {method.attrib["name"]: method for method in classes[package + "NativeTunnel"].findall("method")}

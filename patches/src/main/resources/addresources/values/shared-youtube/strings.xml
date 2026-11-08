@@ -192,7 +192,7 @@ To sign in, press continue below"</string>
     <string name="morphe_skip_silence_minimum_pause_title">Minimum pause length</string>
     <string name="morphe_skip_silence_minimum_pause_summary">Only pauses at least this long are shortened. Takes effect when the next video starts</string>
 
-    <!-- misc.wireguard.wireGuardProxyPatch (unofficial prototype) -->
+    <!-- misc.wireguard.wireGuardProxyPatch -->
     <string name="morphe_wireguard_settings_title">WireGuard proxy</string>
     <string name="morphe_wireguard_settings_summary">Import a WireGuard profile for app-only proxying without a system VPN</string>
     <string name="morphe_wireguard_enabled_title">Use WireGuard proxy</string>
@@ -214,7 +214,16 @@ To sign in, press continue below"</string>
     <string name="morphe_wireguard_restart">Restart app</string>
     <string name="morphe_wireguard_busy">Working…</string>
     <string name="morphe_wireguard_imported">Profile saved. Importing alone does not enable routing. Restart to use a replacement profile.</string>
-    <string name="morphe_wireguard_import_failed">Could not load this profile. Use a supported UTF-8 WireGuard .conf file of at most 64 KiB, and make sure the native library is included.</string>
+    <string name="morphe_wireguard_import_failed">Could not complete the profile operation. Try again.</string>
+    <string name="morphe_wireguard_profile_error_title">Profile operation failed</string>
+    <string name="morphe_wireguard_import_read_failed">Could not read the selected document. Choose an accessible WireGuard .conf file and try again.</string>
+    <string name="morphe_wireguard_import_too_large">The profile exceeds 64 KiB. Choose a smaller WireGuard .conf file.</string>
+    <string name="morphe_wireguard_import_encoding_failed">The profile is not valid UTF-8. Save the WireGuard .conf file as UTF-8 and try again.</string>
+    <string name="morphe_wireguard_import_invalid_text">The profile is empty or contains invalid text. Choose a text WireGuard .conf file.</string>
+    <string name="morphe_wireguard_validation_failed">This profile is not supported by the app-local WireGuard proxy.</string>
+    <string name="morphe_wireguard_native_failed">The WireGuard engine could not be loaded. Repatch with the WireGuard proxy patch using a supported 64-bit APK, then reinstall the app.</string>
+    <string name="morphe_wireguard_store_failed">The profile was validated, but could not be saved securely. Check app storage and AndroidKeyStore availability, then try again.</string>
+    <string name="morphe_wireguard_load_failed">The stored profile could not be read or decrypted. Import the profile again. Check app storage and AndroidKeyStore availability if the problem continues.</string>
     <string name="morphe_wireguard_missing_picker">No system document picker is available.</string>
     <string name="morphe_wireguard_unavailable">WireGuard proxy is not included in this APK. Repatch with the WireGuard proxy patch.</string>
     <string name="morphe_wireguard_enable_confirm">Enable app-only WireGuard routing and restart? Supported requests will not fall back to a direct connection when the tunnel fails.</string>
@@ -223,6 +232,8 @@ To sign in, press continue below"</string>
     <string name="morphe_wireguard_apply_restart">Apply and restart</string>
     <string name="morphe_wireguard_remove_failed">Could not completely remove the stored profile. Check app storage and try again.</string>
     <string name="morphe_wireguard_restart_failed">Restart is required. Close the app completely and open it again.</string>
+    <string name="morphe_wireguard_licenses">Open source licenses</string>
+    <string name="morphe_wireguard_licenses_failed">Could not load open source licenses.</string>
 
     <!-- misc.proxy.networkProxyPatch -->
     <string name="morphe_proxy_screen_title">Network proxy</string>

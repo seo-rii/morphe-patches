@@ -22,6 +22,17 @@ final class ConfigText {
     private ConfigText() {
     }
 
+    enum InvalidTextReason { TOO_LARGE, ENCODING, CONTENT }
+
+    static final class InvalidTextException extends IOException {
+        final InvalidTextReason reason;
+
+        InvalidTextException(InvalidTextReason reason) {
+            super("Invalid profile text: " + reason.name());
+            this.reason = reason;
+        }
+    }
+
     static String read(@Nullable InputStream input) throws IOException {
         byte[] bytes = readLimited(input, MAX_BYTES);
         try {
@@ -45,11 +56,13 @@ final class ConfigText {
                     // InputStream implementations are allowed to return zero; make progress.
                     final int value = input.read();
                     if (value < 0) break;
-                    if (output.size() == maxBytes) throw new IOException("Profile is too large");
+                    if (output.size() == maxBytes) {
+                        throw new InvalidTextException(InvalidTextReason.TOO_LARGE);
+                    }
                     output.write(value);
                 } else {
                     if (count > maxBytes - output.size()) {
-                        throw new IOException("Profile is too large");
+                        throw new InvalidTextException(InvalidTextReason.TOO_LARGE);
                     }
                     output.write(buffer, 0, count);
                 }
@@ -61,9 +74,8 @@ final class ConfigText {
     }
 
     static String decode(byte[] bytes) throws IOException {
-        if (bytes.length == 0 || bytes.length > MAX_BYTES) {
-            throw new IOException("Invalid profile size");
-        }
+        if (bytes.length == 0) throw new InvalidTextException(InvalidTextReason.CONTENT);
+        if (bytes.length > MAX_BYTES) throw new InvalidTextException(InvalidTextReason.TOO_LARGE);
         try {
             String text = StandardCharsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
@@ -71,12 +83,12 @@ final class ConfigText {
                     .decode(ByteBuffer.wrap(bytes)).toString();
             if (text.charAt(0) == '\uFEFF') text = text.substring(1);
             if (text.trim().isEmpty() || text.indexOf('\0') >= 0) {
-                throw new IOException("Invalid profile text");
+                throw new InvalidTextException(InvalidTextReason.CONTENT);
             }
             return text;
         } catch (CharacterCodingException ex) {
             // Decoder exceptions do not include profile data. Do not echo document contents.
-            throw new IOException("Profile must use UTF-8");
+            throw new InvalidTextException(InvalidTextReason.ENCODING);
         }
     }
 }

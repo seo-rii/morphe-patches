@@ -34,6 +34,7 @@ dependencies {
 tasks.withType<Test>().configureEach {
     inputs.files(listOf(
         "wireguard/ConfigText.java",
+        "wireguard/ProfileOperations.java",
         "wireguard/WireGuardConfigStore.java",
         "wireguard/WireGuardProxy.java",
         "patches/NetworkProxyPatch.java",

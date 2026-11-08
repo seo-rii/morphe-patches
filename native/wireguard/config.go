@@ -114,9 +114,9 @@ func parseConfig(text string) (_ *config, resultErr error) {
 			c.privateKey, err = parseKey(value, false)
 		case "interface.address":
 			for _, item := range strings.Split(value, ",") {
-				p, parseErr := netip.ParsePrefix(strings.TrimSpace(item))
+				p, parseErr := parsePrefix(strings.TrimSpace(item))
 				if parseErr != nil || !isUnicast(p.Addr()) || len(c.addresses) >= maxAddresses {
-					return nil, invalid("Address must contain at most 8 unicast IPv4/IPv6 CIDR addresses.")
+					return nil, invalid("Address must contain at most 8 unicast IPv4/IPv6 addresses with optional CIDR masks.")
 				}
 				addr := p.Addr().Unmap()
 				if containsAddr(c.addresses, addr) {
@@ -155,14 +155,18 @@ func parseConfig(text string) (_ *config, resultErr error) {
 			c.endpoint = netip.AddrPortFrom(c.endpoint.Addr().Unmap(), c.endpoint.Port())
 		case "peer.allowedips":
 			for _, item := range strings.Split(value, ",") {
-				p, parseErr := netip.ParsePrefix(strings.TrimSpace(item))
+				p, parseErr := parsePrefix(strings.TrimSpace(item))
 				if parseErr != nil || p.Addr().Zone() != "" || p.Addr().Is4In6() || len(c.routes) >= maxRoutes {
-					return nil, invalid("AllowedIPs must contain at most 256 valid IPv4/IPv6 CIDR routes.")
+					return nil, invalid("AllowedIPs must contain at most 256 valid IPv4/IPv6 addresses or CIDR routes.")
 				}
 				c.routes = append(c.routes, p.Masked())
 			}
 		case "peer.persistentkeepalive":
-			c.keepalive, err = parseUint16(value)
+			if strings.EqualFold(value, "off") {
+				c.keepalive = 0
+			} else {
+				c.keepalive, err = parseUint16(value)
+			}
 		default:
 			// In particular: do not execute PreUp/PostUp/PreDown/PostDown;
 			// do not silently ignore Table, FwMark, SaveConfig or Amnezia keys.
@@ -192,6 +196,18 @@ func parseConfig(text string) (_ *config, resultErr error) {
 		}
 	}
 	return c, nil
+}
+
+// Like wg-quick, a bare numeric address denotes one host, never a subnet.
+func parsePrefix(value string) (netip.Prefix, error) {
+	if strings.Contains(value, "/") {
+		return netip.ParsePrefix(value)
+	}
+	addr, err := netip.ParseAddr(value)
+	if err != nil || addr.Zone() != "" {
+		return netip.Prefix{}, errors.New("invalid address")
+	}
+	return netip.PrefixFrom(addr, addr.BitLen()), nil
 }
 
 func parseKey(value string, allowZero bool) ([32]byte, error) {

@@ -128,7 +128,7 @@ JNIEXPORT void JNICALL Java_app_morphe_extension_shared_wireguard_NativeTunnel_v
     char *error = morphe_wg_validate(conf);
     free_text(conf);
     if (error != NULL) {
-        throw_error(env, "java/lang/IllegalArgumentException", error);
+        throw_error(env, "app/morphe/extension/shared/wireguard/NativeTunnel$InvalidProfileException", error);
         free(error);
     }
 }

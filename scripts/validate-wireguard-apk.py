@@ -436,7 +436,8 @@ def inspect_apk(apk, stock, bundle_path, build_tools, readelf, selected_abis=Non
                     runtime[key] = value
             if PACKAGE + "WireGuardProxy" in classes:
                 marker_is_true(run_tool([dexdump, "-d", dex]))
-        for name in ("ConfigText", "NativeTunnel", "WireGuardConfigStore", "WireGuardProxy",
+        for name in ("ConfigText", "NativeTunnel", "NativeTunnel$InvalidProfileException",
+                     "ProfileOperations", "WireGuardConfigStore", "WireGuardProxy",
                      "WireGuardPreference", "WireGuardSettingsActivity"):
             require(PACKAGE + name in runtime, f"APK runtime class missing: {name}")
         require(all(network_calls.values()), "Network proxy hooks are missing from target app code")

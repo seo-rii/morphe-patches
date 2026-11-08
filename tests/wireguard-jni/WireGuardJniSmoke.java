@@ -65,15 +65,33 @@ public final class WireGuardJniSmoke {
         checks++;
         NativeTunnel.validate("\ufeff" + config());
         checks++;
+        NativeTunnel.validate(config() + "PersistentKeepalive = off\n");
+        checks++;
+        NativeTunnel.validate(config() + "PersistentKeepalive = OFF\n");
+        checks++;
+        NativeTunnel.validate(config().replace("Address = 10.77.0.2/32", "Address = 10.77.0.2"));
+        checks++;
+        NativeTunnel.validate(config().replace("AllowedIPs = 10.77.0.0/24", "AllowedIPs = 10.77.0.1"));
+        checks++;
+        NativeTunnel.validate(config().replace("Address = 10.77.0.2/32", "Address = fd00:77::2")
+                .replace("DNS = 10.77.0.1", "DNS = fd00:77::1")
+                .replace("AllowedIPs = 10.77.0.0/24", "AllowedIPs = fd00:77::1"));
+        checks++;
         rejects(IllegalArgumentException.class, () -> NativeTunnel.validate(null));
         rejects(IllegalArgumentException.class, () -> NativeTunnel.validate(""));
         rejects(IllegalArgumentException.class, () -> NativeTunnel.validate("x".repeat(65537)));
         rejects(IllegalArgumentException.class, () -> NativeTunnel.validate(config() + "\u0000"));
         rejects(IllegalArgumentException.class, () -> NativeTunnel.validate(config() + "# \ud800\n"));
-        rejects(IllegalArgumentException.class, () -> NativeTunnel.validate(
+        rejects(NativeTunnel.InvalidProfileException.class, () -> NativeTunnel.validate(
                 config().replace("[Peer]", "PostUp = secret-hook-marker\n[Peer]")));
         rejects(IllegalArgumentException.class, () -> NativeTunnel.validate(
                 config().replace("127.0.0.1:51820", "example.test:51820")));
+        rejects(IllegalArgumentException.class, () -> NativeTunnel.validate(
+                config().replace("AllowedIPs = 10.77.0.0/24", "AllowedIPs = 10.77.0.2")));
+        rejects(IllegalArgumentException.class, () -> NativeTunnel.validate(
+                config().replace("AllowedIPs = 10.77.0.0/24", "AllowedIPs = ::ffff:10.77.0.1")));
+        rejects(IllegalArgumentException.class, () -> NativeTunnel.validate(
+                config().replace("Address = 10.77.0.2/32", "Address = fd00:77::2%test")));
         rejects(IllegalArgumentException.class, () -> NativeTunnel.start(config(), USER, PASSWORD, -1));
         NativeTunnel.stop();
         NativeTunnel.stop();
