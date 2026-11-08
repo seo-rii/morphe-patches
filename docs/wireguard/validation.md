@@ -377,6 +377,76 @@ and pass both `-Dmorphe.publicSources=/path/to/dependencies` and
 source dependencies without replacing upstream's normal CI repository setup.
 They do not bypass APK/device testing.
 
+## Morphe settings UI and profile-import follow-up (2026-11-08)
+
+Production changes are recorded in `86e1f0897154` (shared Morphe preference UI)
+and `9913ae7a4407` (import diagnostics and standard host-route syntax). Both apps
+reuse the existing settings theme and toolbar. The nonpersistent switch still
+requires explicit confirmation, validation and restart. The encrypted profile
+format/key alias and the default-off routing policy are unchanged.
+
+The import workflow separates document access, UTF-8/size/content, native
+loading/validation, secure save and stored-profile load failures. Only the
+dedicated JNI `InvalidProfileException` supplies the parser's fixed, value-free
+reason; arbitrary provider/storage exception messages and causes are discarded.
+The parser now accepts case-insensitive keepalive `off` and bare numeric
+`Address`/`AllowedIPs`. Omitted masks denote `/32` or `/128` host routes. Numeric
+endpoints, explicit in-route DNS, one peer and rejection of hooks remain required.
+
+| Check | Final contribution result |
+| --- | --- |
+| Source Gradle build/test/resource graph | PASS: 1,481 cases, 1,476 passed, 5 existing Jam APK-dependent skips, no failures/errors |
+| New import workflow boundary suite | 24 passed, included above; real decoding/sequencing with external provider/JNI/store stubs |
+| Native Go race/vet | PASS: 26 top-level tests and seed corpus; standard syntax regressions failed before the fix |
+| Host JNI | 42 checks passed; Linux JVM, not Android |
+| Python verification tools | 33 tests passed |
+| Both native ABIs and complete source bundle | PASS; ordinary source build, no prior-bundle rewriting |
+| Real Morphe loader | 203 patches; both WireGuard patches/defaults/dependencies present |
+| JVM and Android DEX defaults | Both apps verified `true`; connection setting remains `false` |
+| DEX/JNI/native/resources | PASS; dedicated exception plus public String constructor and matching native FindClass names; unique English resources and indexed notices |
+
+Final contribution bundle SHA-256:
+`58c1728705754ff117aac037addbf420ee887fa4b1101731a51ac1e0242f8675`.
+The custom v2.1.0-based build was checked separately (608 cases, 603 passed,
+5 existing skips); its results are not counted in the contribution total.
+Its bounded parser fuzz run passed 20,450 executions. Matching Android ELF
+outputs from these two source trees were:
+
+| ABI | SHA-256 |
+| --- | --- |
+| arm64-v8a | `92a4775daa7c6ab83b50193d8a746b66876fcc35a243c5c107613bb8ee0d83b4` |
+| x86_64 | `faef4a8b199be97e628a5f4f955b5a2782e236ae5992f032c4fc171702ad186e` |
+
+Both recommended originals were signature/CRC checked. The uploaded universal
+YouTube APK used an explicitly labeled unsigned arm64-only fixture with retained
+content verified against the original. Music used its original arm64 APK. No
+compatibility force option was used.
+
+| Target | WireGuard-focused | Complete defaults |
+| --- | --- | --- |
+| YouTube 21.30.216 | Desktop `--validate` and final APK inspection PASS | PASS |
+| Music 9.30.53 | Desktop `--validate` and final APK inspection PASS | PASS |
+
+These four final-bundle cases passed. Minimum/experimental versions in earlier
+sections were not rerun for this artifact, and the older Captions ambiguity
+remains historical evidence. Inspection covers native payload equality, DEX/JNI
+classes/signatures, app-code hooks, resources/notices, manifest and alignment.
+It does not execute the target apps or prove routing/leak behavior on Android.
+
+Completed private logs, all exit 0:
+
+- Source/bundle: `~/logs/morphe-wireguard-profile-fix-upstream-verified-rljei5cz.log`.
+- APK matrix: `~/logs/morphe-wireguard-profile-fix-apk-upstream-verified-ac3i4pnv.log`.
+- Native race/vet: `~/logs/morphe-wireguard-profile-native-after-70u4pqpv.log`.
+
+The reporting user's original import failure has not been reproduced on that
+device. Actual settings rendering/picker grants, AndroidKeyStore, profile
+import, server handshake, playback, DNS, handoff and concurrency remain NOT RUN
+for this artifact. A further fresh API 30 software-emulator attempt exited
+before guest boot because userdata creation required more disk space than was
+available. It installed no target APK and supplies no app-level result. Earlier
+shell-UID Android JNI checks belong to their earlier artifact cohort only.
+
 ## Before public submission
 
 - Refresh `dev` comparison and preserve unrelated upstream changes.

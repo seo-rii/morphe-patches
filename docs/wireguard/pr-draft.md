@@ -59,6 +59,26 @@ claim that all required dependency modules are free of advisories.
 
 ### Test results
 
+Latest UI/import follow-up: the normal source build passed 1,476 of 1,481
+Java/Kotlin cases (5 existing APK-dependent skips), including 24 new import
+workflow cases. Go race/vet (26 top-level tests), 42 host JNI checks and 33
+Python checks passed. Both app JVM/Android DEX defaults are true; routing remains
+off until explicitly enabled. The exact native exception class/String constructor,
+ABI payloads, resources and notices are present.
+
+YouTube 21.30.216 and Music 9.30.53 each passed focused and complete-default
+Desktop `--validate` plus final APK inspection: four cases for bundle SHA-256
+`58c1728705754ff117aac037addbf420ee887fa4b1101731a51ac1e0242f8675`.
+The signed originals were verified; universal YouTube used an explicit unsigned
+arm64-only fixture with retained content checked. No force flag was used.
+Target-app UI/import, AndroidKeyStore, handshake/playback/DNS and network
+transitions remain unverified. The reporting user's import failure has not
+been reproduced on their device. This is still a fork draft before any official
+upstream submission. See the latest section of [validation.md](validation.md).
+
+The records below retain earlier source/artifact cohorts; their counts are not
+additional results for the new bundle.
+
 Initial checks executed on 2026-11-07; exact commands, tool versions and limits are in
 [validation.md](validation.md) and [build.md](build.md):
 
