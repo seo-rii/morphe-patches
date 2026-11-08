@@ -97,26 +97,33 @@ had 31 passing tests. [Full input hashes, scope and evidence](apkpure-validation
 APKPure-matrix unsigned artifact: `patches-2.3.0-wireguard-dev.mpp` (24,205,503 bytes),
 SHA-256 `fa272d0d6f49b0b65b6d252c353659a24318bac68fefdbb71ca43350702e2d94`.
 
-The subsequent runtime fix (`bf67c82f2`) propagates interrupted plaintext HTTP
-responses. Eight encrypted-tunnel HTTP/HTTPS regression cases, native race/vet,
-host JNI and both ABI/bundle builds passed. Its 24,205,410-byte unsigned bundle
-has SHA-256 `b3b69ab2cf654618f2a323680a86d5ae3efa264f267ab7db16a6beffbe927bf4`.
-The author then supplied the APKMirror YouTube 21.30.216 original after APKPure
-access remained blocked. Checker fix `3923ee3c6` preserves NDK readelf's multicall
-alias and passed both new CLI regressions and all 33 Python tests. The full run
-passed both focused (1 named patch,
-including dependencies) and normal-default (113 patches) Desktop `--validate`
-and final APK inspections, with matrix exit 0. Both patched outputs are unsigned
-arm64 APKs produced from an explicit ABI-only fixture of the verified universal
-original. Other APKPure-version results above remain evidence for the earlier
-bundle; they were not rerun with
-this correction. See the separate
-[uploaded-input record](validation.md#uploaded-apkmirror-original-follow-up-2026-11-08).
+The reviewed runtime propagates interrupted plaintext HTTP responses and drains
+peer receivers before closing the userspace TUN (`d91a66090`). Eight encrypted
+HTTP/HTTPS body cases, the gated shutdown regression (20 race repetitions),
+300 repeated lifecycle shutdown rounds, the full native suite (23 tests plus
+fuzz seeds), vet and 31 host JNI checks passed. Both native ABIs and the rebuilt
+24,205,686-byte source bundle passed native/DEX/JNI/resource inspections;
+the bundle SHA-256 is
+`705738552dce5ce575884062df9f5da90bd29b11e4984428e3ac92ad8fc8e3fc`.
+The verifier preserves NDK readelf's multicall alias and has 33 passing Python
+tests.
+
+Using the author's verified APKMirror YouTube 21.30.216 original, this final
+bundle passed focused (1 named patch, including dependencies) and normal-default
+(113 patches) Desktop `--validate` plus both final APK inspections, matrix exit
+0. Both outputs are unsigned arm64 APKs made from an explicit ABI-only fixture
+of the Google-signed universal original. The earlier R2 run used `bf67c82f2` and
+bundle `b3b69ab2cf654618f2a323680a86d5ae3efa264f267ab7db16a6beffbe927bf4`;
+it remains a distinct previous cohort. Other APKPure-version results above were
+not rerun with the final bundle. Exact artifacts, the failed CI race result and
+corrected local verification are in
+[shutdown validation](validation.md#native-shutdown-and-final-artifact-follow-up-2026-11-08).
 
 **Not run:** target-app installation/settings/import/handshake/playback/DNS/
 failure/handoff/concurrent-app acceptance. Two isolated emulator attempts had
-framework ANRs/restarts before target app installation. A stable Android environment and controlled test peer
-are needed. No target-app runtime result is established by host JNI tests,
+framework ANRs/restarts before target app installation. A stable Android
+environment and controlled test peer are needed. No target-app runtime result is
+established by host JNI tests,
 APK validation, metadata listing or shell-UID Android JNI smoke.
 
 - [ ] Tested on both the **minimum** and **maximum** supported versions

@@ -38,11 +38,13 @@ Captions ambiguity remains, also reproduced with WireGuard disabled. APKPure
 access for the newest recommended YouTube 21.30.216 remained blocked; the author
 later supplied a separately verified APKMirror original. Focused and normal-default
 `--validate` plus both final APK inspections passed with matrix exit 0 using the
-reviewed `bf67c82f2` runtime bundle. The verification CLI preserves NDK readelf's
-executable alias and has 33 passing Python tests;
-the older APKPure cases remain results for their earlier bundle. These are host
-checks, not Android playback/handshake/leak-test results.
-The historical APKPure results and separate uploaded-input record are in
+current `d91a66090` runtime bundle and explicit unsigned arm64 input. The native
+shutdown drains peer receivers before closing the userspace TUN; its ordering
+regression, repeated lifecycle stress, native race/vet, host JNI and both
+ABI/source-bundle checks passed. The verifier has 33 passing Python tests.
+Older APKPure cases and the intermediate APKMirror run remain separate earlier
+bundle cohorts. These are host checks, not Android playback/handshake/leak-test
+results. Exact inputs, failed attempts and final artifacts are in
 `docs/wireguard/apkpure-validation.md` and `docs/wireguard/validation.md`.
 
 I propose keeping small app-specific WireGuard patches depending on their

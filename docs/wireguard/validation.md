@@ -195,8 +195,8 @@ were verified against the upstream allowlist before deriving the input:
 The Source Stamp certificate is recorded separately and is not an APK signer
 allowlist input. The uploaded original and its stable snapshot remain unchanged.
 
-The runtime/bundle is `bf67c82f2`, including the reviewed HTTP truncation fix.
-The unsigned source-built `.mpp` is 24,205,410 bytes, SHA-256
+This R2 cohort used runtime/bundle `bf67c82f2`, including the reviewed HTTP
+truncation fix. Its unsigned source-built `.mpp` was 24,205,410 bytes, SHA-256
 `b3b69ab2cf654618f2a323680a86d5ae3efa264f267ab7db16a6beffbe927bf4`.
 The checker source is `3923ee3c67ab098e539b83e6bfdd32a078d81e57`.
 The original universal APK is preserved. Explicit
@@ -240,7 +240,9 @@ results and per-APK inspection reports. Completed matrix log:
 `~/logs/morphe-wireguard-youtube-max-apkmirror-validate-r2-r_ibqi_1.log`, exit 0.
 The earlier failed R1 attempt remains recorded separately with exit 1.
 
-To reproduce from the project root, set `YOUTUBE_MAX_APK` to the unchanged
+The command below is the shared procedure for a target run; select the bundle
+matching the intended cohort's recorded hash. To run it from the project root,
+set `YOUTUBE_MAX_APK` to the unchanged
 uploaded original, `MORPHE_DESKTOP` to the Desktop 2.1.1 JAR,
 `JAVA_HOME`/`ANDROID_HOME` to the toolchains above and
 `WIREGUARD_VALIDATION_OUTPUT` to a new output directory. Confirm the original
@@ -260,9 +262,82 @@ python3 scripts/validate-wireguard-apk.py matrix \
 ```
 
 This is host patching/static inspection evidence for this one target and
-runtime bundle. It does not rerun the older APKPure versions with the current
+runtime bundle. It does not rerun the older APKPure versions with the R2
 bundle. Outputs are unsigned. Android installation, UI, profile import,
 handshake, playback, DNS, failure/handoff and concurrent-app execution remain
+NOT RUN.
+
+## Native shutdown and final-artifact follow-up (2026-11-08)
+
+[CI run 42450379295](https://github.com/seo-rii/morphe-patches/actions/runs/42450379295)
+at `d0ac62944` failed the native race test. A peer receiver could still be inside
+netstack `TUN.Write` when `Device.Close` closed the TUN's channel. Earlier local
+passes and the R2 static APK checks do not negate that failed CI result.
+
+Runtime correction `d91a6609029b31d20e19ea83132c8d600137ea5e` removes and drains
+all WireGuard peers before closing the device/TUN. The shared
+`closeWireGuardDevice` helper is used by `Engine.Close`, all three startup-error
+cleanup paths and the test-peer cleanup. Removing peers also prevents a delayed
+TUN-up event from restarting those receivers. Dependency pins, JNI signatures,
+routing policy and profile storage are unchanged.
+
+| Check | Actual result |
+| --- | --- |
+| `TestShutdownWaitsForPeerReceiverBeforeClosingTUN` | Failed before the correction; passed 20 repetitions under `-race` afterward, 3.519s |
+| Existing memory-peer lifecycle stress | PASS under `-race`: 100 iterations / 300 shutdown rounds, 24.288s |
+| Full native `go test -race -count=1 ./...` | PASS: 23 top-level tests plus fuzz seeds, 9.335s |
+| Native `go vet ./...` | PASS |
+| Rebuilt host JNI lifecycle/validation smoke | PASS, 31 checks |
+
+The new regression holds an actual encrypted peer receiver inside `TUN.Write`
+while shutdown is requested, then verifies that closing the TUN waits for that
+write to finish. Its gated wrapper protects failed assertions from triggering
+the same upstream race. These host checks do not establish Android network
+handoff or target-app shutdown behavior.
+
+Both Android native payloads were rebuilt from this correction. The Gradle
+source bundle/real-loader task passed in 1m6s (6 executed, 269 up-to-date), and
+native ELF protections, 16 KiB LOAD alignment, JNI exports, final DEX/JNI,
+resources and notice checks passed. Completed build log:
+`~/logs/morphe-wireguard-shutdown-fix-bundle-90e5ix19.log`, exit 0.
+
+| Corrected artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| arm64-v8a native payload | 10,090,472 | `665ea92eb96b0b30c3f8d1b862e58e18369ae1ad1529356f94e4a00409dc453b` |
+| x86_64 native payload | 10,802,120 | `0c66ee9c6fa20eedb1af1906e18cddfbc445e25a0b084d5696713f05917cbddd` |
+| `patches-2.3.0-wireguard-dev.mpp` | 24,205,686 | `705738552dce5ce575884062df9f5da90bd29b11e4984428e3ac92ad8fc8e3fc` |
+
+A separate R3 run with this bundle passed both YouTube 21.30.216 focused and
+complete-default Desktop `--validate` runs and all final APK inspections. The
+matrix exited 0. The unchanged verified original and explicit unsigned arm64
+input are the same as R2: fixture SHA-256
+`c18b272cc8c0b168aee3f8f504ab89f25a1a018bba6e6fb91b6de8d44530064a`,
+16,655 retained entries content-verified, no compatibility force.
+
+| R3 selection | Applied patches | Desktop / inspection | DEX files | Unsigned APK bytes | APK SHA-256 |
+| --- | ---: | --- | ---: | ---: | --- |
+| WireGuard focused, including dependencies | 1 named patch | PASS / PASS | 12 | 116,110,234 | `aeb434d33cf36fc9d758242faa4d6c2efda6f269dc195f898213f3541004fc9c` |
+| Complete normal defaults | 113 | PASS / PASS | 15 | 122,514,788 | `6c19209c3c95fb01bc981c7328827f51583e083c59fa81ae7c3a575c03bbcb77` |
+
+Both outputs passed exact corrected arm64 payload equality, ELF/JNI and DEX/JNI
+checks, 30 English resource keys, 34 notices, the true inclusion marker,
+private Activity/manifest checks and 16 KiB APK alignment. Their target-app hook
+counts remain `applyProxyOptions` 1, `recordCronetEngine` 1,
+`setMainCronetEngine` 1 and `initialize` 2. Runtime source, checker/test, bundle
+and input snapshot hashes remained unchanged throughout the run.
+
+Results are retained in
+`morphe-patches/.git/wireguard-reference/apkmirror/matrix-youtube-max-arm64-r3`.
+Completed matrix log:
+`~/logs/morphe-wireguard-youtube-max-apkmirror-validate-r3-fzn7if2e.log`, exit 0.
+Use the uploaded-input command above with this cohort's rebuilt bundle to repeat
+the same focused/default host checks.
+
+The R2 `b3b69ab2...` artifacts remain a previous cohort; neither their results
+nor the historical APKPure cases are relabeled as this rebuilt bundle's results.
+The failed CI run remains failed evidence; these corrected results are local
+checks. This run covers one target/version and arm64 fixtures. Android target-app
+execution, handshake/playback, network handoff and device shutdown remain
 NOT RUN.
 
 ## Reproduction commands
@@ -306,9 +381,8 @@ They do not bypass APK/device testing.
 
 - Refresh `dev` comparison and preserve unrelated upstream changes.
 - Recheck source/artifact identifiers if implementation changes.
-- Recheck required version cases when the final artifact changes; the current
-  bundle's uploaded-input run covers YouTube 21.30.216. Keep the observed
-  older-target Captions failure and other unrerun version cases visible.
+- Recheck required version cases when the final artifact changes. Keep the
+  observed older-target Captions failure and other unrerun version cases visible.
 - Record Android acceptance results; disclose every unrun row and uncovered path.
 - Review native notice distribution, dependency ownership and default selection
   with maintainers.
