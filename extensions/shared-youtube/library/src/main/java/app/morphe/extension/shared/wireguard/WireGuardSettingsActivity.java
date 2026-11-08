@@ -29,7 +29,6 @@ import androidx.annotation.Nullable;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -163,18 +162,14 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
         if (requestCode != IMPORT_REQUEST || resultCode != RESULT_OK || data == null) return;
         Uri uri = data.getData();
         if (uri == null || !"content".equals(uri.getScheme())) {
-            toast("morphe_wireguard_import_failed");
+            showProfileFailure("morphe_wireguard_import_read_failed", null);
             return;
         }
         Context application = getApplicationContext();
         runOperation(() -> {
-            String config;
-            try (InputStream input = application.getContentResolver().openInputStream(uri)) {
-                config = ConfigText.read(input);
-            }
-            NativeTunnel.validate(config);
+            ProfileOperations.importProfile(application,
+                    () -> application.getContentResolver().openInputStream(uri));
             if (Thread.currentThread().isInterrupted()) return;
-            WireGuardConfigStore.save(application, config);
             WireGuardProxy.markRestartRequired();
         }, () -> {
             toast("morphe_wireguard_imported");
@@ -192,7 +187,7 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
                 .setPositiveButton(str("morphe_wireguard_apply_restart"), (dialog, which) -> {
                     Context application = getApplicationContext();
                     runOperation(() -> {
-                        if (enable) NativeTunnel.validate(WireGuardConfigStore.load(application));
+                        if (enable) ProfileOperations.validateStoredProfile(application);
                         if (Thread.currentThread().isInterrupted()) return;
                         // Morphe settings persist synchronously; changing routing in this process
                         // is deliberately avoided because existing engines keep their proxy options.
@@ -223,22 +218,41 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
         refreshState();
         worker.execute(() -> {
             boolean completed = false;
+            ProfileOperations.Failure failure = null;
             try {
                 operation.run();
                 completed = !Thread.currentThread().isInterrupted();
+            } catch (ProfileOperations.Failure ex) {
+                failure = ex;
+                Logger.printException(() -> "WireGuard profile operation failed: " + ex.resourceKey);
             } catch (Exception | LinkageError ex) {
                 // Neither document URIs, profile contents, native errors nor keys are logged.
                 Logger.printException(() -> "WireGuard profile operation failed");
             }
             final boolean succeeded = completed;
+            ProfileOperations.Failure profileFailure = failure;
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 busy = false;
                 refreshState();
                 if (succeeded) success.run();
-                else toast(failureKey);
+                else if (profileFailure != null) {
+                    showProfileFailure(profileFailure.resourceKey, profileFailure.validationReason);
+                } else toast(failureKey);
             });
         });
+    }
+
+    private void showProfileFailure(String resourceKey, @Nullable String validationReason) {
+        String message = str(resourceKey);
+        if (validationReason != null && !validationReason.isEmpty()) {
+            message += "\n\n" + validationReason;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(str("morphe_wireguard_profile_error_title"))
+                .setMessage(message)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
     }
 
     private void restart() {

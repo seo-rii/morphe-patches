@@ -29,6 +29,77 @@ func TestValidateSupportedConfig(t *testing.T) {
 	}
 }
 
+func TestValidateStandardKeepaliveOff(t *testing.T) {
+	for _, value := range []string{"off", "OFF", "OfF", "0"} {
+		t.Run(value, func(t *testing.T) {
+			text := strings.Replace(fixtureConfig(), "PersistentKeepalive = 25", "PersistentKeepalive = "+value, 1)
+			c, err := parseConfig(text)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer c.clearKeys()
+			if c.keepalive != 0 || !strings.Contains(c.uapi(), "persistent_keepalive_interval=0\n") {
+				t.Fatal("off did not disable persistent keepalive")
+			}
+		})
+	}
+}
+
+func TestValidateStandardBareAddresses(t *testing.T) {
+	cases := []struct {
+		name, address string
+		want          []netip.Addr
+	}{
+		{"IPv4", "10.77.0.2", []netip.Addr{netip.MustParseAddr("10.77.0.2")}},
+		{"mixed", "10.77.0.2, fd00:77::2", []netip.Addr{netip.MustParseAddr("10.77.0.2"), netip.MustParseAddr("fd00:77::2")}},
+		{"mixed CIDR", "10.77.0.2/32, fd00:77::2", []netip.Addr{netip.MustParseAddr("10.77.0.2"), netip.MustParseAddr("fd00:77::2")}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			text := strings.Replace(fixtureConfig(), "Address = 10.77.0.2/32", "Address = "+tc.address, 1)
+			c, err := parseConfig(text)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer c.clearKeys()
+			if len(c.addresses) != len(tc.want) {
+				t.Fatal("interface addresses changed")
+			}
+			for i, want := range tc.want {
+				if c.addresses[i] != want {
+					t.Fatal("interface address changed")
+				}
+			}
+		})
+	}
+}
+
+func TestBareAllowedIPsRemainHostRoutes(t *testing.T) {
+	cases := []struct {
+		name, local, server, adjacent, prefix string
+	}{
+		{"IPv4", "10.77.0.2", "10.77.0.1", "10.77.0.3", "10.77.0.1/32"},
+		{"IPv6", "fd00:77::2", "fd00:77::1", "fd00:77::3", "fd00:77::1/128"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			text := strings.NewReplacer("Address = 10.77.0.2/32", "Address = "+tc.local,
+				"DNS = 10.77.0.1", "DNS = "+tc.server,
+				"AllowedIPs = 10.77.0.0/24", "AllowedIPs = "+tc.server).Replace(fixtureConfig())
+			c, err := parseConfig(text)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer c.clearKeys()
+			if len(c.routes) != 1 || c.routes[0].String() != tc.prefix ||
+				!c.allows(netip.MustParseAddr(tc.server)) || c.allows(netip.MustParseAddr(tc.adjacent)) ||
+				!strings.Contains(c.uapi(), "allowed_ip="+tc.prefix+"\n") {
+				t.Fatal("bare AllowedIPs expanded beyond its single host")
+			}
+		})
+	}
+}
+
 func TestValidateRejectsUnsupportedOrUnsafeConfig(t *testing.T) {
 	cases := map[string]string{
 		"shell hook":         strings.Replace(fixtureConfig(), "[Peer]", "PostUp = touch /tmp/never-executed\n[Peer]", 1),
@@ -50,6 +121,17 @@ func TestValidateRejectsUnsupportedOrUnsafeConfig(t *testing.T) {
 		"missing interface":  strings.Replace(fixtureConfig(), "[Interface]\n", "", 1),
 		"short key":          strings.Replace(fixtureConfig(), "PrivateKey = ", "PrivateKey = BAD", 1),
 		"negative keepalive": strings.Replace(fixtureConfig(), "= 25", "= -1", 1),
+		"invalid off value":  strings.Replace(fixtureConfig(), "= 25", "= offx", 1),
+		"oversize keepalive": strings.Replace(fixtureConfig(), "= 25", "= 65536", 1),
+		"bare address name":  strings.Replace(fixtureConfig(), "10.77.0.2/32", "client.example", 1),
+		"address empty CIDR": strings.Replace(fixtureConfig(), "10.77.0.2/32", "10.77.0.2/", 1),
+		"address empty item": strings.Replace(fixtureConfig(), "10.77.0.2/32", "10.77.0.2,", 1),
+		"bare zoned address": strings.Replace(fixtureConfig(), "10.77.0.2/32", "fd00:77::2%test", 1),
+		"route empty CIDR":   strings.Replace(fixtureConfig(), "10.77.0.0/24", "10.77.0.1/", 1),
+		"bare route name":    strings.Replace(fixtureConfig(), "10.77.0.0/24", "server.example", 1),
+		"bare mapped route":  strings.Replace(fixtureConfig(), "10.77.0.0/24", "::ffff:10.77.0.1", 1),
+		"bare zoned route":   strings.Replace(fixtureConfig(), "10.77.0.0/24", "fd00:77::1%test", 1),
+		"bare route DNS":     strings.Replace(fixtureConfig(), "10.77.0.0/24", "10.77.0.2", 1),
 		"oversized":          strings.Repeat("#", MaxConfigBytes+1),
 		"long line":          strings.Repeat("#", maxConfigLine+1),
 		"embedded NUL":       fixtureConfig() + "\x00",
