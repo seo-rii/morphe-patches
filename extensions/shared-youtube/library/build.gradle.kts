@@ -29,6 +29,19 @@ dependencies {
     compileOnly(project(":extensions:shared-youtube:stub"))
 }
 
+// Boundary tests compile the production sources against isolated host stubs.
+// Reading those sources at test runtime must invalidate a cached test result.
+tasks.withType<Test>().configureEach {
+    inputs.files(listOf(
+        "wireguard/ConfigText.java",
+        "wireguard/WireGuardConfigStore.java",
+        "wireguard/WireGuardProxy.java",
+        "patches/NetworkProxyPatch.java",
+    ).map { file("src/main/java/app/morphe/extension/shared/$it") })
+        .withPropertyName("wireguardBoundarySources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 protobuf {
     protoc {
         artifact = libs.protobuf.protoc.get().toString()

@@ -108,7 +108,7 @@ func newTestPeerWithBind(t *testing.T, serverBind, clientBind conn.Bind, ipv6 bo
 		t.Fatal(err)
 	}
 	dev := device.NewDevice(tun, serverBind, device.NewLogger(device.LogLevelSilent, ""))
-	t.Cleanup(dev.Close)
+	t.Cleanup(func() { closeWireGuardDevice(dev) })
 	uapi := fmt.Sprintf("private_key=%s\nlisten_port=0\npublic_key=%s\nallowed_ip=%s\n", hex.EncodeToString(serverKey.Bytes()), hex.EncodeToString(clientKey.PublicKey().Bytes()), clientAddress)
 	if err := dev.IpcSet(uapi); err != nil {
 		t.Fatal("test peer configuration failed")

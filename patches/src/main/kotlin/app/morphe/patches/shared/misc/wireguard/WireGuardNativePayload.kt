@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// See the included NOTICE file for additional GPLv3 Section 7 requirements.
+
 package app.morphe.patches.shared.misc.wireguard
 
 /** Native payload validation before a modified APK is produced. */

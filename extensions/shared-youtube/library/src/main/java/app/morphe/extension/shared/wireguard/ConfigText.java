@@ -1,4 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// See the included NOTICE file for additional GPLv3 Section 7 requirements.
+
 package app.morphe.extension.shared.wireguard;
+
+import androidx.annotation.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -17,7 +22,7 @@ final class ConfigText {
     private ConfigText() {
     }
 
-    static String read(InputStream input) throws IOException {
+    static String read(@Nullable InputStream input) throws IOException {
         byte[] bytes = readLimited(input, MAX_BYTES);
         try {
             return decode(bytes);
@@ -26,7 +31,7 @@ final class ConfigText {
         }
     }
 
-    static byte[] readLimited(InputStream input, int maxBytes) throws IOException {
+    static byte[] readLimited(@Nullable InputStream input, int maxBytes) throws IOException {
         if (input == null) throw new IOException("Profile is unavailable");
         if (maxBytes < 1) throw new IllegalArgumentException("Invalid size limit");
         ByteArrayOutputStream output = new ByteArrayOutputStream();

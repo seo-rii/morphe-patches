@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// See the included NOTICE file for additional GPLv3 Section 7 requirements.
+
 package app.morphe.extension.shared.wireguard;
 
 import android.util.Base64;
@@ -11,6 +14,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.util.Arrays;
 
 import app.morphe.extension.shared.Logger;
 import app.morphe.extension.shared.Utils;
@@ -79,12 +83,14 @@ public final class WireGuardProxy {
         new SecureRandom().nextBytes(randomBytes);
         String password = Base64.encodeToString(randomBytes,
                 Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
+        Arrays.fill(randomBytes, (byte) 0);
         String authorization = "Basic " + Base64.encodeToString(
                 (USERNAME + ":" + password).getBytes(StandardCharsets.US_ASCII), Base64.NO_WRAP);
         try {
             String config = WireGuardConfigStore.load(Utils.getContext());
             final int port = NativeTunnel.start(config, USERNAME, password, 0);
             if (port < 1 || port > 65535) {
+                NativeTunnel.stop();
                 throw new IllegalStateException("Invalid local proxy port");
             }
             endpoint = new Endpoint(port, authorization);
@@ -99,11 +105,16 @@ public final class WireGuardProxy {
     }
 
     private static int startFailureListener() {
+        ServerSocket listener;
         try {
-            ServerSocket listener = new ServerSocket();
+            listener = new ServerSocket();
+        } catch (IOException ex) {
+            throw new IllegalStateException("WireGuard cannot safely establish a local proxy");
+        }
+        boolean started = false;
+        try {
             listener.bind(new InetSocketAddress(
                     InetAddress.getByAddress(new byte[]{127, 0, 0, 1}), 0), FAILURE_LISTEN_BACKLOG);
-            failureListener = listener;
             Thread thread = new Thread(() -> {
                 while (!listener.isClosed()) {
                     Socket accepted;
@@ -128,9 +139,21 @@ public final class WireGuardProxy {
             }, "morphe-wireguard-blocked");
             thread.setDaemon(true);
             thread.start();
+            started = true;
+            failureListener = listener;
             return listener.getLocalPort();
         } catch (IOException ex) {
             throw new IllegalStateException("WireGuard cannot safely establish a local proxy");
+        } finally {
+            // Failed bind or thread startup must not leak the socket. After successful startup
+            // the port remains reserved until process death, including a later accept failure.
+            if (!started) {
+                try {
+                    listener.close();
+                } catch (IOException ex) {
+                    Logger.printException(() -> "WireGuard blocking listener cleanup failed");
+                }
+            }
         }
     }
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// See the included NOTICE file for additional GPLv3 Section 7 requirements.
+
 package app.morphe.extension.shared.wireguard;
 
 import android.content.Context;
@@ -6,6 +9,7 @@ import android.security.keystore.KeyProperties;
 import android.util.AtomicFile;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,6 +22,8 @@ import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
+
+import app.morphe.extension.shared.Logger;
 
 /**
  * Profiles contain private keys. They never enter Morphe preferences, logs, exports or backups.
@@ -37,8 +43,18 @@ final class WireGuardConfigStore {
     private WireGuardConfigStore() {
     }
 
-    static boolean hasProfile(Context context) {
-        return storage(context).getBaseFile().isFile();
+    static synchronized boolean hasProfile(Context context) {
+        // openRead restores AtomicFile's previous committed copy after an interrupted write.
+        // Looking only at the base path would hide that recoverable profile on older Android.
+        try (InputStream ignored = storage(context).openRead()) {
+            return true;
+        } catch (FileNotFoundException ex) {
+            return false;
+        } catch (IOException ex) {
+            Logger.printException(
+                    () -> "WireGuard profile availability check failed");
+            return false;
+        }
     }
 
     static synchronized void save(Context context, String config)

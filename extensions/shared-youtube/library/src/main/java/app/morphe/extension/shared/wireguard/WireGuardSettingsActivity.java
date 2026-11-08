@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// See the included NOTICE file for additional GPLv3 Section 7 requirements.
+
 package app.morphe.extension.shared.wireguard;
 
 import static app.morphe.extension.shared.StringRef.str;
@@ -7,6 +10,7 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.AssetManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
@@ -18,7 +22,12 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -35,6 +44,7 @@ public final class WireGuardSettingsActivity extends Activity {
     private static final int IMPORT_REQUEST = 0x5747;
     private static final int PAGE_PADDING_DP = 20;
     private static final int STATUS_TEXT_SP = 16;
+    private static final String LICENSE_ASSET_PATH = "wireguard/licenses";
 
     // Executors create their first thread lazily, only after a user starts an operation.
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -70,6 +80,7 @@ public final class WireGuardSettingsActivity extends Activity {
         toggleButton = button(content, "morphe_wireguard_enable", view -> confirmToggle());
         removeButton = button(content, "morphe_wireguard_remove", view -> confirmRemove());
         restartButton = button(content, "morphe_wireguard_restart", view -> restart());
+        button(content, "morphe_wireguard_licenses", view -> showLicenses());
         setContentView(scroll);
         refreshState();
     }
@@ -228,6 +239,42 @@ public final class WireGuardSettingsActivity extends Activity {
             Logger.printException(() -> "WireGuard settings require a manual app restart");
             toast("morphe_wireguard_restart_failed");
         }
+    }
+
+    private void showLicenses() {
+        StringBuilder notices = new StringBuilder();
+        runOperation(() -> appendLicenses(getAssets(), LICENSE_ASSET_PATH, notices), () -> {
+            TextView text = new TextView(this);
+            text.setText(notices.toString());
+            text.setTextIsSelectable(true);
+            final int padding = Math.round(PAGE_PADDING_DP * getResources().getDisplayMetrics().density);
+            text.setPadding(padding, padding, padding, padding);
+            ScrollView scroll = new ScrollView(this);
+            scroll.addView(text);
+            new AlertDialog.Builder(this)
+                    .setTitle(str("morphe_wireguard_licenses"))
+                    .setView(scroll)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show();
+        }, "morphe_wireguard_licenses_failed");
+    }
+
+    private static void appendLicenses(AssetManager assets, String path, StringBuilder notices)
+            throws IOException {
+        String[] children = assets.list(path);
+        if (children == null) throw new IOException("License assets are unavailable");
+        if (children.length > 0) {
+            Arrays.sort(children);
+            for (String child : children) appendLicenses(assets, path + "/" + child, notices);
+            return;
+        }
+        notices.append(path.substring(LICENSE_ASSET_PATH.length() + 1)).append("\n\n");
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                assets.open(path), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) notices.append(line).append('\n');
+        }
+        notices.append("\n\n");
     }
 
     private void toast(String key) {

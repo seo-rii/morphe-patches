@@ -85,16 +85,16 @@ func startWithBind(text, username, password string, listenPort int, bind conn.Bi
 	// The default logger is deliberately silent, including UAPI failures.
 	dev := device.NewDevice(tun, bind, device.NewLogger(device.LogLevelSilent, ""))
 	if err := dev.IpcSet(c.uapi()); err != nil {
-		dev.Close()
+		closeWireGuardDevice(dev)
 		return nil, errors.New("could not configure the WireGuard engine")
 	}
 	if err := dev.Up(); err != nil {
-		dev.Close()
+		closeWireGuardDevice(dev)
 		return nil, errors.New("could not open the WireGuard transport")
 	}
 	listener, err := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(listenPort)))
 	if err != nil {
-		dev.Close()
+		closeWireGuardDevice(dev)
 		return nil, errors.New("could not bind the local proxy port")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -162,6 +162,14 @@ func validCredentials(username, password string) bool {
 // Port returns the bound 127.0.0.1 TCP port.
 func (e *Engine) Port() int { return e.port }
 
+func closeWireGuardDevice(dev *device.Device) {
+	// Device.Close closes the TUN before stopping receivers. Drain/remove peers
+	// first so an in-flight netstack write cannot race the TUN's channel close.
+	// Removing them also prevents a delayed TUN-up event from restarting them.
+	dev.RemoveAllPeers()
+	dev.Close()
+}
+
 // Close is idempotent. It cancels pending requests and closes all streams,
 // including CONNECT streams that net/http no longer owns after hijacking.
 func (e *Engine) Close() {
@@ -179,7 +187,7 @@ func (e *Engine) Close() {
 			_ = c.Close()
 		}
 		e.transport.CloseIdleConnections()
-		e.device.Close() // Owns and closes its userspace TUN exactly once.
+		closeWireGuardDevice(e.device) // Owns and closes its userspace TUN exactly once.
 		<-e.done
 	})
 }

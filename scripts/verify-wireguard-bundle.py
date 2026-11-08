@@ -83,6 +83,16 @@ def main():
             require(len(bundle.read(resource)) > 0, f"Missing notice: {resource}")
         require(bundle.read("wireguard/licenses/MORPHE-NOTICE.txt") == (repo / "NOTICE").read_bytes(),
                 "Original Morphe NOTICE changed during packaging")
+        license_root = "wireguard/licenses/"
+        indexed_licenses = bundle.read(license_root + "INDEX").decode("utf-8").splitlines()
+        actual_licenses = {name[len(license_root):] for name in names
+                           if name.startswith(license_root) and not name.endswith("/")
+                           and name != license_root + "INDEX"}
+        require(indexed_licenses == sorted(actual_licenses), "License index is incomplete or duplicated")
+        for relative in indexed_licenses:
+            require(not relative.startswith("/") and ".." not in Path(relative).parts,
+                    "Unsafe license index path")
+            require(bundle.read(license_root + relative), "Empty license notice")
 
         resources = ET.fromstring(bundle.read("addresources/values/shared-youtube/strings.xml"))
         resource_names = [item.attrib["name"] for item in resources.findall("string")]
@@ -94,7 +104,7 @@ def main():
         print(f"PASS UI resources: {len(required)} keys; original and dependency notices present")
 
         manifest = bundle.read("META-INF/MANIFEST.MF").decode("utf-8").replace("\r\n ", "")
-        require("unofficial" in manifest.lower(), "Bundle is not marked unofficial")
+        require(re.search(r"^Version: \S+", manifest, re.MULTILINE), "Bundle version is missing")
         patch_classes = [f"app.morphe.patches.{app}.misc.wireguard.WireGuardPatchKt"
                          for app in ("youtube", "music")]
         for patch_class in patch_classes:

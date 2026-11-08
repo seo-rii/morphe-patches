@@ -1,3 +1,4 @@
 /build/
-# Generated with `go mod vendor`; included separately in the delivery archive.
+# Dependencies are pinned in go.mod/go.sum; do not commit a vendor snapshot.
 /vendor/
+__pycache__/

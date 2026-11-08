@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Optional credential-free build; normal upstream builds do not use this file.
+def sourceRoot = System.getProperty('morphe.publicSources')
+if (!sourceRoot) {
+    throw new GradleException('Set -Dmorphe.publicSources=/absolute/path/to/prepared/public-sources')
+}
+def patchRootValue = System.getProperty('morphe.patchRoot')
+if (!patchRootValue) {
+    throw new GradleException('Run from the patch root with -Dmorphe.patchRoot="$PWD"')
+}
+// Included builds have their own currentDir. An explicit root prevents the
+// plugin build from accidentally including itself while loading its settings.
+def patchRoot = new File(patchRootValue).canonicalFile
+
+gradle.beforeSettings { settings ->
+    if (settings.settingsDir.canonicalFile == patchRoot) {
+        settings.pluginManagement {
+            includeBuild(new File(sourceRoot, 'morphe-patches-gradle-plugin').absolutePath)
+        }
+        settings.includeBuild(new File(sourceRoot, 'morphe-patcher')) {
+            dependencySubstitution {
+                substitute(module('app.morphe:morphe-patcher')).using(project(':'))
+            }
+        }
+        settings.includeBuild(new File(sourceRoot, 'morphe-patches-library')) {
+            dependencySubstitution {
+                substitute(module('app.morphe:morphe-patches-library')).using(project(':patch-library'))
+                substitute(module('app.morphe:morphe-extensions-library')).using(project(':extension-library'))
+            }
+        }
+    }
+}
+
+gradle.settingsEvaluated { settings ->
+    settings.dependencyResolutionManagement.repositories.removeAll { repository ->
+        repository.hasProperty('url') && repository.url?.host == 'maven.pkg.github.com'
+    }
+}
+
+gradle.beforeProject { project ->
+    project.repositories.all { repository ->
+        if (repository.hasProperty('url') && repository.url?.host == 'maven.pkg.github.com') {
+            project.repositories.remove(repository)
+        }
+    }
+}
