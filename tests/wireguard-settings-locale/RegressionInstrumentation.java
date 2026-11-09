@@ -5,10 +5,13 @@ package app.morphe.wireguard.locale;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Instrumentation;
+import android.app.UiAutomation;
+import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.preference.Preference;
 import android.preference.PreferenceScreen;
 import android.view.View;
@@ -32,12 +35,16 @@ import app.morphe.extension.shared.wireguard.WireGuardSettingsActivity;
 
 /** Actual Android Activity and widget regression, with inert transport/settings collaborators. */
 public final class RegressionInstrumentation extends Instrumentation {
+    private static final long DIALOG_TIMEOUT_MS=10_000;
+    private static final long DIALOG_POLL_MS=50;
+    private static final int DIALOG_STABLE_POLLS=3;
     private Bundle args;
     private final List<String> failures=new ArrayList<>();
     private int checks;
     private String scenario;
     private String localLanguage;
     private Activity settings;
+    private UiAutomation automation;
 
     @Override public void onCreate(Bundle arguments) { args=arguments;start(); }
 
@@ -87,8 +94,70 @@ public final class RegressionInstrumentation extends Instrumentation {
         return null;
     }
 
-    private List<String> windowTexts() {
-        List<String> result=new ArrayList<>();collect(getUiAutomation().getRootInActiveWindow(),result);return result;
+    private void initializeAccessibility() {
+        automation=getUiAutomation();
+        AccessibilityServiceInfo info=automation.getServiceInfo();
+        if(info==null)throw new IllegalStateException("Accessibility service is unavailable");
+        info.flags|=AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
+        automation.setServiceInfo(info);
+    }
+
+    private boolean hasDialogButton(AccessibilityNodeInfo root) {
+        boolean visible=false;
+        for(AccessibilityNodeInfo node:root.findAccessibilityNodeInfosByViewId("android:id/button1")) {
+            visible|=node.isVisibleToUser();
+            node.recycle();
+        }
+        return visible;
+    }
+
+    private AccessibilityNodeInfo awaitDialogState(String name,boolean shown) throws Exception {
+        final long deadline=SystemClock.uptimeMillis()+DIALOG_TIMEOUT_MS;
+        int stable=0;
+        int previousWindow=-1;
+        boolean rootPresent=false;
+        boolean buttonVisible=false;
+        while(SystemClock.uptimeMillis()<deadline) {
+            AccessibilityNodeInfo root=automation.getRootInActiveWindow();
+            rootPresent=root!=null;
+            if(rootPresent) {
+                buttonVisible=hasDialogButton(root);
+                final int window=root.getWindowId();
+                if(buttonVisible==shown) {
+                    stable=window==previousWindow ? stable+1 : 1;
+                    previousWindow=window;
+                    if(stable>=DIALOG_STABLE_POLLS)return root;
+                } else {
+                    stable=0;
+                    previousWindow=-1;
+                }
+                root.recycle();
+            } else {
+                stable=0;
+                previousWindow=-1;
+            }
+            Thread.sleep(DIALOG_POLL_MS);
+        }
+        // Synchronization depends only on structure, never the expected translation.
+        throw new IllegalStateException("Dialog fixture timeout: "+name+", shown="+shown
+                +", rootPresent="+rootPresent+", positiveButtonVisible="+buttonVisible);
+    }
+
+    private List<String> openDialog(String name,Runnable open) throws Exception {
+        awaitDialogState(name+" before opening",false).recycle();
+        runOnMainSync(open);
+        waitForIdleSync();
+        List<String> result=new ArrayList<>();
+        collect(awaitDialogState(name+" opening",true),result);
+        return result;
+    }
+
+    private void dismissDialog(String name) throws Exception {
+        if(!automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)) {
+            throw new IllegalStateException("Could not dismiss dialog fixture: "+name);
+        }
+        waitForIdleSync();
+        awaitDialogState(name+" dismissal",false).recycle();
     }
 
     private void collect(AccessibilityNodeInfo node,List<String> out) {
@@ -99,16 +168,15 @@ public final class RegressionInstrumentation extends Instrumentation {
     }
 
     private void dialog(String name,Runnable open,String... expectedKeys) throws Exception {
-        runOnMainSync(open);waitForIdleSync();Thread.sleep(250);
-        List<String> shown=windowTexts();
+        List<String> shown=openDialog(name,open);
         for(String key:expectedKeys){checks++;String expected=text(key);if(!shown.contains(expected))failures.add(name+": missing "+expected+"; visible="+shown);}
-        getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK);
-        waitForIdleSync();Thread.sleep(100);
+        dismissDialog(name);
     }
 
     @Override public void onStart() {
         Bundle result=new Bundle();
         try {
+            initializeAccessibility();
             scenario=args.getString("scenario","activity-ko-cached-en");
             localLanguage=scenario.equals("english-fallback") ? "zz" : "ko";
             Context base=getTargetContext();
@@ -160,9 +228,9 @@ public final class RegressionInstrumentation extends Instrumentation {
             });
             dialog("error",()->invoke("showProfileFailure",new Class<?>[]{String.class,String.class},"morphe_wireguard_validation_failed","morphe_wireguard_error_invalid_endpoint"),"morphe_wireguard_profile_error_title");
             // Combined message is one real TextView, so verify both detail components together.
-            runOnMainSync(()->invoke("showProfileFailure",new Class<?>[]{String.class,String.class},"morphe_wireguard_validation_failed","morphe_wireguard_error_invalid_endpoint"));waitForIdleSync();Thread.sleep(250);
-            List<String> shown=windowTexts();String combined=text("morphe_wireguard_validation_failed")+"\n\n"+text("morphe_wireguard_error_invalid_endpoint");checks++;if(!shown.contains(combined))failures.add("error details: expected="+combined+"; visible="+shown);
-            getUiAutomation().performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK);waitForIdleSync();
+            List<String> shown=openDialog("error details",()->invoke("showProfileFailure",new Class<?>[]{String.class,String.class},"morphe_wireguard_validation_failed","morphe_wireguard_error_invalid_endpoint"));
+            String combined=text("morphe_wireguard_validation_failed")+"\n\n"+text("morphe_wireguard_error_invalid_endpoint");checks++;if(!shown.contains(combined))failures.add("error details: expected="+combined+"; visible="+shown);
+            dismissDialog("error details");
             dialog("disable confirmation",()->invoke("confirmToggle",new Class<?>[0]),"morphe_wireguard_settings_title","morphe_wireguard_disable_confirm","morphe_wireguard_apply_restart");
             SharedYouTubeSettings.WIREGUARD_ENABLED.value=false;
             dialog("enable confirmation",()->invoke("confirmToggle",new Class<?>[0]),"morphe_wireguard_settings_title","morphe_wireguard_enable_confirm","morphe_wireguard_apply_restart");
