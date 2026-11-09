@@ -55,6 +55,15 @@ public final class RegressionInstrumentation extends Instrumentation {
         return activity;
     }
 
+    @Override public void callActivityOnCreate(Activity activity,Bundle state) {
+        // Headless tests must not depend on a fixture's keyguard or display sleep state.
+        activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                | android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                | android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                | android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+        super.callActivityOnCreate(activity,state);
+    }
+
     private void equal(String label,CharSequence actual,String expected) {
         checks++; if(!expected.contentEquals(actual==null ? "<null>" : actual)) {
             failures.add(label+": expected="+expected+"; actual="+actual);
