@@ -103,12 +103,17 @@ public final class RegressionInstrumentation extends Instrumentation {
     }
 
     private boolean hasDialogButton(AccessibilityNodeInfo root) {
-        boolean visible=false;
-        for(AccessibilityNodeInfo node:root.findAccessibilityNodeInfosByViewId("android:id/button1")) {
-            visible|=node.isVisibleToUser();
-            node.recycle();
+        if("android:id/button1".equals(root.getViewIdResourceName()) && root.isVisibleToUser()) {
+            return true;
         }
-        return visible;
+        for(int i=0;i<root.getChildCount();i++) {
+            AccessibilityNodeInfo child=root.getChild(i);
+            if(child==null)continue;
+            boolean visible=hasDialogButton(child);
+            child.recycle();
+            if(visible)return true;
+        }
+        return false;
     }
 
     private AccessibilityNodeInfo awaitDialogState(String name,boolean shown) throws Exception {
