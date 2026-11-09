@@ -3,8 +3,6 @@
 
 package app.morphe.extension.shared.wireguard;
 
-import static app.morphe.extension.shared.StringRef.str;
-
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Fragment;
@@ -69,7 +67,7 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         customizeActivityTheme(this);
         super.onCreate(savedInstanceState);
-        setTitle(str("morphe_wireguard_settings_title"));
+        setTitle(localizedString("morphe_wireguard_settings_title"));
         setContentView(getContentViewResourceId());
         getWindow().getDecorView().setBackgroundColor(ThemeUtils.getAppBackgroundColor());
 
@@ -128,12 +126,13 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
 
     @Override
     protected void onPostToolbarSetup(Activity activity, Toolbar toolbar, PreferenceFragment fragment) {
-        toolbar.setTitle(str("morphe_wireguard_settings_title"));
+        toolbar.setTitle(localizedString("morphe_wireguard_settings_title"));
+        toolbar.setNavigationContentDescription(localizedString("morphe_settings_navigate_up"));
         toolbar.setFilterTouchesWhenObscured(true);
         ToolbarPreferenceFragment.addToolbarButton(toolbar, "morphe_settings_screen_00_about",
-                str("morphe_settings_screen_info_title"), () -> new AlertDialog.Builder(this)
-                        .setTitle(str("morphe_wireguard_settings_title"))
-                        .setMessage(str("morphe_wireguard_intro"))
+                localizedString("morphe_settings_screen_info_title"), () -> new AlertDialog.Builder(this)
+                        .setTitle(localizedString("morphe_wireguard_settings_title"))
+                        .setMessage(localizedString("morphe_wireguard_intro"))
                         .setPositiveButton(android.R.string.ok, null)
                         .show());
     }
@@ -180,11 +179,11 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
     private void confirmToggle() {
         final boolean enable = !SharedYouTubeSettings.WIREGUARD_ENABLED.get();
         new AlertDialog.Builder(this)
-                .setTitle(str("morphe_wireguard_settings_title"))
-                .setMessage(str(enable ? "morphe_wireguard_enable_confirm"
+                .setTitle(localizedString("morphe_wireguard_settings_title"))
+                .setMessage(localizedString(enable ? "morphe_wireguard_enable_confirm"
                         : "morphe_wireguard_disable_confirm"))
                 .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(str("morphe_wireguard_apply_restart"), (dialog, which) -> {
+                .setPositiveButton(localizedString("morphe_wireguard_apply_restart"), (dialog, which) -> {
                     Context application = getApplicationContext();
                     runOperation(() -> {
                         if (enable) ProfileOperations.validateStoredProfile(application);
@@ -199,10 +198,10 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
 
     private void confirmRemove() {
         new AlertDialog.Builder(this)
-                .setTitle(str("morphe_wireguard_remove"))
-                .setMessage(str("morphe_wireguard_remove_confirm"))
+                .setTitle(localizedString("morphe_wireguard_remove"))
+                .setMessage(localizedString("morphe_wireguard_remove_confirm"))
                 .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(str("morphe_wireguard_apply_restart"), (dialog, which) -> {
+                .setPositiveButton(localizedString("morphe_wireguard_apply_restart"), (dialog, which) -> {
                     Context application = getApplicationContext();
                     runOperation(() -> {
                         WireGuardConfigStore.delete(application);
@@ -244,12 +243,12 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
     }
 
     private void showProfileFailure(String resourceKey, @Nullable String validationReasonKey) {
-        String message = str(resourceKey);
+        String message = localizedString(resourceKey);
         if (validationReasonKey != null && !validationReasonKey.isEmpty()) {
-            message += "\n\n" + str(validationReasonKey);
+            message += "\n\n" + localizedString(validationReasonKey);
         }
         new AlertDialog.Builder(this)
-                .setTitle(str("morphe_wireguard_profile_error_title"))
+                .setTitle(localizedString("morphe_wireguard_profile_error_title"))
                 .setMessage(message)
                 .setPositiveButton(android.R.string.ok, null)
                 .show();
@@ -275,7 +274,7 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
             ScrollView scroll = new ScrollView(this);
             scroll.addView(text);
             new AlertDialog.Builder(this)
-                    .setTitle(str("morphe_wireguard_licenses"))
+                    .setTitle(localizedString("morphe_wireguard_licenses"))
                     .setView(scroll)
                     .setPositiveButton(android.R.string.ok, null)
                     .show();
@@ -300,8 +299,13 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
         notices.append("\n\n");
     }
 
+    private String localizedString(String key) {
+        // Match this screen's locale without reusing process-wide cached string values.
+        return getString(ResourceUtils.getIdentifierOrThrow(this, ResourceType.STRING, key));
+    }
+
     private void toast(String key) {
-        Toast.makeText(this, str(key), Toast.LENGTH_LONG).show();
+        Toast.makeText(this, localizedString(key), Toast.LENGTH_LONG).show();
     }
 
     /** Framework-restorable preference list; profile operations remain owned by the Activity. */
@@ -331,7 +335,7 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
             screen.setOrderingAsAdded(true);
 
             enabled = new RoutingSwitchPreference(activity);
-            enabled.setTitle(str("morphe_wireguard_enabled_title"));
+            enabled.setTitle(activity.localizedString("morphe_wireguard_enabled_title"));
             enabled.setOnPreferenceChangeListener((preference, value) -> {
                 activity.confirmToggle();
                 // Only validation and the confirmation handler may persist this setting.
@@ -340,7 +344,7 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
             screen.addPreference(enabled);
 
             status = new ActionPreference(activity);
-            status.setTitle(str("morphe_wireguard_status_title"));
+            status.setTitle(activity.localizedString("morphe_wireguard_status_title"));
             status.setSelectable(false);
             screen.addPreference(status);
 
@@ -361,10 +365,10 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
             if (list != null) list.setFilterTouchesWhenObscured(true);
         }
 
-        private static Preference action(PreferenceScreen screen, Context context, String titleKey,
-                                         Runnable onClick) {
-            Preference preference = new ActionPreference(context);
-            preference.setTitle(str(titleKey));
+        private static Preference action(PreferenceScreen screen, WireGuardSettingsActivity activity,
+                                         String titleKey, Runnable onClick) {
+            Preference preference = new ActionPreference(activity);
+            preference.setTitle(activity.localizedString(titleKey));
             preference.setOnPreferenceClickListener(clicked -> {
                 onClick.run();
                 return true;
@@ -385,16 +389,16 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
                 case READY -> "morphe_wireguard_state_ready";
                 case BLOCKED -> "morphe_wireguard_state_blocked";
             };
-            String state = str(available ? stateKey : "morphe_wireguard_unavailable");
-            if (activity.busy) state += "\n\n" + str("morphe_wireguard_busy");
+            String state = activity.localizedString(available ? stateKey : "morphe_wireguard_unavailable");
+            if (activity.busy) state += "\n\n" + activity.localizedString("morphe_wireguard_busy");
             status.setSummary(state);
             enabled.setChecked(savedEnabled);
-            enabled.setSummary(str(savedEnabled ? "morphe_wireguard_saved_enabled"
+            enabled.setSummary(activity.localizedString(savedEnabled ? "morphe_wireguard_saved_enabled"
                     : "morphe_wireguard_saved_disabled"));
-            importProfile.setSummary(str(hasProfile ? "morphe_wireguard_profile_present"
+            importProfile.setSummary(activity.localizedString(hasProfile ? "morphe_wireguard_profile_present"
                     : "morphe_wireguard_profile_missing"));
             restartApp.setSummary(WireGuardProxy.isRestartRequired()
-                    ? str("morphe_wireguard_restart_needed") : null);
+                    ? activity.localizedString("morphe_wireguard_restart_needed") : null);
 
             enabled.setEnabled(available && !activity.busy && (hasProfile || savedEnabled));
             importProfile.setEnabled(available && !activity.busy);
