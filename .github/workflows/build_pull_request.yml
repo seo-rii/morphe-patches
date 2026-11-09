@@ -135,6 +135,12 @@ jobs:
           test "$(git -C .wireguard-locale-library rev-parse HEAD)" = 11f8c7e4d9dd64e18b0594d2c7cbf09176a65327
           git cat-file -e dc3819a6920bef55b71bb8708378e3dcb01f6497^{commit}
 
+      - name: Install emulator host runtime library
+        timeout-minutes: 5
+        run: |
+          sudo -n apt-get update > "$WIREGUARD_LOCALE_CI/logs/host-package-update.log" 2>&1
+          sudo -n apt-get install -y --no-install-recommends libpulse0 > "$WIREGUARD_LOCALE_CI/logs/host-libraries.log" 2>&1
+
       - name: Install normal Android SDK inputs
         timeout-minutes: 10
         run: |
@@ -152,6 +158,7 @@ jobs:
           (root/'logs/sdk-install.exit').write_text(str(result.returncode)+'\n')
           assert result.returncode == 0, 'SDK installation failed; see bounded artifact log'
           PY
+          ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64" > "$WIREGUARD_LOCALE_CI/logs/emulator-host-libraries.txt"
           "$ANDROID_HOME/emulator/emulator" -accel-check > "$WIREGUARD_LOCALE_CI/logs/accel-check.txt" 2>&1
           "$ANDROID_HOME/emulator/emulator" -version > "$WIREGUARD_LOCALE_CI/logs/emulator-version.txt" 2>&1
 
