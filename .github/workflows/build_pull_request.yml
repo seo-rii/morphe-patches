@@ -123,9 +123,14 @@ jobs:
           root = Path(os.environ['RUNNER_TEMP'])
           free = shutil.disk_usage(root).free
           assert free >= 12 * 1024**3, f'At least 12 GiB free disk required; found {free} bytes'
-          fd = os.open('/dev/kvm', os.O_RDWR)
-          os.close(fd)
+          try:
+              fd = os.open('/dev/kvm', os.O_RDWR)
+              os.close(fd)
+          except PermissionError as error:
+              print('Python KVM probe:', error, flush=True)
+          # The SDK check is authoritative for the emulator executable.
           PY
+          "$ANDROID_HOME/emulator/emulator" -accel-check > "$WIREGUARD_LOCALE_CI/logs/initial-accel-check.txt" 2>&1
           test "$(git -C .wireguard-locale-library rev-parse HEAD)" = 11f8c7e4d9dd64e18b0594d2c7cbf09176a65327
           git cat-file -e dc3819a6920bef55b71bb8708378e3dcb01f6497^{commit}
 
