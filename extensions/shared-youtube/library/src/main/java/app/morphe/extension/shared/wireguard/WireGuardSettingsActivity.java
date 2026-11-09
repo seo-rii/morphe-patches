@@ -237,16 +237,16 @@ public final class WireGuardSettingsActivity extends BaseActivityHook {
                 refreshState();
                 if (succeeded) success.run();
                 else if (profileFailure != null) {
-                    showProfileFailure(profileFailure.resourceKey, profileFailure.validationReason);
+                    showProfileFailure(profileFailure.resourceKey, profileFailure.validationReasonKey);
                 } else toast(failureKey);
             });
         });
     }
 
-    private void showProfileFailure(String resourceKey, @Nullable String validationReason) {
+    private void showProfileFailure(String resourceKey, @Nullable String validationReasonKey) {
         String message = str(resourceKey);
-        if (validationReason != null && !validationReason.isEmpty()) {
-            message += "\n\n" + validationReason;
+        if (validationReasonKey != null && !validationReasonKey.isEmpty()) {
+            message += "\n\n" + str(validationReasonKey);
         }
         new AlertDialog.Builder(this)
                 .setTitle(str("morphe_wireguard_profile_error_title"))
