@@ -116,6 +116,8 @@ jobs:
           printf 'WIREGUARD_LOCALE_CI=%s\n' "$wireguard_ci" >> "$GITHUB_ENV"
           test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           test -x "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          # Grant only this disposable runner user access to the existing KVM device.
+          sudo -n setfacl -m "u:$(id -un):rw" /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
           python3 - <<'PY'
           import os, shutil
