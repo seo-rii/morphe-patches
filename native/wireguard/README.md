@@ -158,7 +158,7 @@ open that Linux-only route-monitor socket. Actual Android operation still needs
 a device test; successful in-memory tests and cross-compilation do not prove it.
 
 The commands above document how to run the tests. The
-[maintenance validation report](../../docs/wireguard-maintenance-2.1.3.md) records what
+[maintenance validation report](../../docs/wireguard-i18n-2.1.4.md) records what
 was actually executed separately from device expectations.
 
 ## Dependencies and licenses

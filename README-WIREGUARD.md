@@ -7,15 +7,27 @@ Morphe Patches v2.1.0에 YouTube와 YouTube Music용 앱 내부 WireGuard 프록
 백포팅했으며 최신 upstream 전체를 덮어쓰지 않았습니다.
 
 관리자는 v2.1.1을 실제 Android 기기에서 잘 사용했다고 확인했습니다(2026-11-07).
-이 경험과 v2.1.3 자동화 검증은 구분합니다. 새 UI의 기기 화면 확인, 실제 서버
+이 경험과 v2.1.4 자동화 검증은 구분합니다. 새 UI의 기기 화면 확인, 실제 서버
 handshake, 재생, DNS 경로 및 Wi-Fi/모바일 전환은 새로 실행한 것으로 간주하지
-않습니다. [이번 변경 및 검증 기록](docs/wireguard-maintenance-2.1.3.md)과
+않습니다. [이번 변경 및 검증 기록](docs/wireguard-i18n-2.1.4.md)과
 [기기 검증 절차](docs/wireguard-device-acceptance.md)를 참고하세요.
 
-## v2.1.3 변경
+## v2.1.4 변경
+
+- 한국어·일본어·중국어 간체/번체·스페인어·프랑스어·독일어·브라질 포르투갈어의
+  WireGuard 설정 및 오류 문자열 60개를 추가했습니다. 다른 Morphe 설정과 같은
+  Android 리소스와 앱 언어 설정을 사용하며, 언어 변경에는 기존 재시작 규칙이 적용됩니다.
+- 네이티브 검증 오류 19개를 고정 코드로 전달하고 Java에서 허용된 리소스 키로만
+  변환하여 번역합니다. 알 수 없거나 이전 형식인 오류는 일반 오류로 표시하며
+  원시 백엔드 메시지나 프로필 값을 화면에 노출하지 않습니다.
+- 이 번역은 관리자가 요청한 커스텀 배포판용 추가입니다. 공식 기여 브랜치는
+  영어 원문 및 Crowdin 번역 정책을 유지하며 이 번역 파일을 포함하지 않습니다.
+- 암호화된 프로필 형식·키 별칭·전송 구조와 아래의 v2.1.3 수정 사항을 유지합니다.
+
+## 유지된 v2.1.3 수정
 
 - 가져오기 실패를 파일 접근·UTF-8/크기·설정 검증·엔진 로딩·암호화 저장 단계로
-  구분하고, 프로필 값이 없는 정제된 네이티브 검증 사유를 표시합니다.
+  구분합니다. v2.1.4에서는 네이티브 검증 사유도 리소스로 번역합니다.
 - `PersistentKeepalive = off`와 CIDR을 생략한 숫자 `Address`·`AllowedIPs`를
   지원합니다. 생략한 경로는 IPv4 `/32`, IPv6 `/128`인 단일 호스트 경로입니다.
 - 다른 Morphe 설정 페이지와 같은 테마·툴바·Preference 행과 활성화 스위치를
@@ -84,11 +96,11 @@ WebView, Cast, GmsCore 및 별도 프로세스는 추가 검증 대상입니다.
 네이티브 payload는 Gradle의 `processResources` 전에 소스에서 자동으로 만듭니다.
 Go 1.26.10, Android NDK 28.2.13676358, API 26이 필요합니다. 산출물은
 `native/wireguard/build/android/<abi>/libmorphewireguard.so`와
-`patches/build/libs/patches-2.1.3.mpp`입니다.
+`patches/build/libs/patches-2.1.4.mpp`입니다.
 
 최종 번들 생성 뒤 JVM/Android DEX 기본 선택을 모두 확인합니다.
 `scripts/set-wireguard-defaults.py verify`는 검사용으로만 사용할 수 있습니다.
-역사적인 v2.1.2 재패키징용 `repair`는 v2.1.3 빌드 경로가 아닙니다.
+역사적인 v2.1.2 재패키징용 `repair`는 v2.1.4 빌드 경로가 아닙니다.
 
 [네이티브 설명](native/wireguard/README.md)에 프로필 문법, Go/JNI 테스트 및
 실패 정책을, [기기 체크리스트](docs/wireguard-device-acceptance.md)에 **예상 결과**와

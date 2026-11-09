@@ -1,6 +1,6 @@
 # Building the unofficial WireGuard bundle from source
 
-The v2.1.3 source retains Morphe Patches v2.1.0 at
+The v2.1.4 source retains Morphe Patches v2.1.0 at
 `8fa2c7a1a832498de8f179748998a3ca87e198eb`. Only the WireGuard maintenance
 changes from the contribution branch are backported. Existing unrelated patch
 sources and their dependency declarations are preserved.
@@ -119,7 +119,7 @@ rebuilding the extracted ZIP on another machine.
 Use actual paths for the bundle and installed Android SDK/NDK:
 
 ```sh
-wireguard_bundle=patches/build/libs/patches-2.1.3.mpp
+wireguard_bundle=patches/build/libs/patches-2.1.4.mpp
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 scripts/verify-wireguard-bundle.py "$wireguard_bundle" \
   --dexdump "$ANDROID_HOME/build-tools/36.0.0/dexdump"
@@ -138,11 +138,11 @@ actual patch/SDK/validation results. A successful APK build/`--validate` does
 not establish app launch, profile import, remote handshake, playback, DNS path,
 network handoff, or complete app coverage.
 
-[Maintenance validation](wireguard-maintenance-2.1.3.md) records the
+[Maintenance validation](wireguard-i18n-2.1.4.md) records the
 commands actually executed and their limits. Historical v2.1.0/v2.1.2 reports
 remain in `docs/` and do not stand in for this release's checks. For device
 checks use [the acceptance checklist](wireguard-device-acceptance.md).
 The checksums for the published release are in `RELEASE-SHA256SUMS.txt` in the
 custom repository/release. Byte equality across other operating systems or NDK
 host packages is not claimed. Do not run the historical artifact `repair`
-subcommand to create v2.1.3; all release inputs come from this source build.
+subcommand to create v2.1.4; all release inputs come from this source build.

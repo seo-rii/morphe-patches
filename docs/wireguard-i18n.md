@@ -24,10 +24,25 @@ contribution keeps English source edits and Crowdin-managed locale files.
 Existing non-WireGuard translations are preserved. No official Crowdin upload
 or translation write was performed.
 
-
 Host validation includes all-code Go/JNI checks, workflow privacy/fallback tests,
 and a cross-language native/Java/XML contract check. An isolated test bundle
 simulates Crowdin Korean output with explicit test markers; APK inspection checks
 Korean inclusion and the default English fallback. This fixture is not a real
-translation and must not be published. Android rendering/language switching is
-still a device check. Published v2.1.3 assets and its corresponding source remain unchanged.
+translation and must not be published.
+
+The custom release also verifies the real production translations against actual
+compiled APK resources. Run the following after patching the target APKs:
+
+```sh
+python3 scripts/verify-wireguard-locales.py patches/build/libs/patches-2.1.4.mpp \
+  --aapt2 "$ANDROID_HOME/build-tools/36.0.0/aapt2" \
+  --apk /path/to/patched-youtube.apk --apk /path/to/patched-music.apk \
+  --output /path/to/compiled-locales.json
+```
+
+The checker compares all 60 values in the default configuration and each of the
+eight locale configurations. It rejects a missing locale rather than accepting
+English fallback as evidence of translation. This verifies compiled values;
+Android rendering and language switching remain device checks. See the
+[v2.1.4 release record](wireguard-i18n-2.1.4.md) for results. Published v2.1.3
+assets and its corresponding source remain unchanged.
