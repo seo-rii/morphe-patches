@@ -67,7 +67,12 @@ Create and boot a disposable API 30 or newer emulator using normal SDK tooling.
 The caller owns its lifecycle and storage. The runner accepts an explicit
 `emulator-*` serial, uninstalls only its two disposable test package IDs, and
 does not create/reset an AVD or change system locale. Allow sufficient disk space
-for the emulator's normal image requirements. No emulator is started by CI.
+for the emulator's normal image requirements. Ordinary CI builds do not start
+an emulator. Maintainers can explicitly dispatch the contribution's existing
+`Build pull request` workflow with `wireguard_locale_test=true` for an isolated,
+accelerated Android 15 (API 35) run. That job uses pinned external Korean test
+resources without editing product translations and skips the unrelated full
+build for that UI-only dispatch.
 
 ```sh
 python3 tests/wireguard-settings-locale/run_harness.py \
