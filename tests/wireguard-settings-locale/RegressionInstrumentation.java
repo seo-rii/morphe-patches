@@ -174,7 +174,16 @@ public final class RegressionInstrumentation extends Instrumentation {
 
     private void dialog(String name,Runnable open,String... expectedKeys) throws Exception {
         List<String> shown=openDialog(name,open);
-        for(String key:expectedKeys){checks++;String expected=text(key);if(!shown.contains(expected))failures.add(name+": missing "+expected+"; visible="+shown);}
+        for(String key:expectedKeys) {
+            checks++;
+            String expected=text(key);
+            boolean matches=shown.contains(expected);
+            // Material buttons may expose their all-caps presentation to accessibility.
+            if(!matches && key.equals("morphe_wireguard_apply_restart")) {
+                matches=shown.contains(expected.toUpperCase(settings.getResources().getConfiguration().getLocales().get(0)));
+            }
+            if(!matches)failures.add(name+": missing "+expected+"; visible="+shown);
+        }
         dismissDialog(name);
     }
 
