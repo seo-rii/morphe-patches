@@ -1,0 +1,4 @@
+/build/
+# Dependencies are pinned in go.mod/go.sum; do not commit a vendor snapshot.
+/vendor/
+__pycache__/

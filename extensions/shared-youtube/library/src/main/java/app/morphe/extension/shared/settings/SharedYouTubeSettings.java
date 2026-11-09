@@ -56,6 +56,10 @@ public class SharedYouTubeSettings extends BaseSettings {
     public static final StringSetting PROXY_AUTH_PASSWORD = new StringSetting("morphe_proxy_auth_password", "", true, false, null, parent(PROXY_AUTH_ENABLED));
     public static final BooleanSetting PROXY_ALLOW_DIRECT_FALLBACK = new BooleanSetting("morphe_proxy_allow_direct_fallback", FALSE, true, parent(PROXY_ENABLED));
 
+    // WireGuard profile/private keys are encrypted outside preferences and excluded from backups.
+    // Do not export the enable flag: restoring it without its profile must not enable broken routing.
+    public static final BooleanSetting WIREGUARD_ENABLED = new BooleanSetting("morphe_wireguard_enabled", FALSE, true, false);
+
     public static final BooleanSetting DISABLE_DRC_AUDIO = new BooleanSetting("morphe_disable_drc_audio", FALSE, true);
     public static final BooleanSetting FORCE_ORIGINAL_AUDIO = new BooleanSetting("morphe_force_original_audio", TRUE, true);
     public static final BooleanSetting SKIP_SILENCE = new BooleanSetting("morphe_skip_silence", FALSE, true);
