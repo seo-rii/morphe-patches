@@ -55,15 +55,23 @@ def main():
             health()
             try:
                 ready = adb('shell', 'getprop', 'sys.boot_completed', timeout=10)
-                if ready.returncode == 0 and ready.stdout.strip() == '1': break
+                report['last_boot_readiness']={'boot_completed':ready.stdout.strip(),'boot_query_exit':ready.returncode}
+                if ready.returncode == 0 and ready.stdout.strip() == '1':
+                    package=adb('shell','pm','path','android',timeout=10)
+                    report['last_boot_readiness'].update(framework_package_exit=package.returncode,framework_package_output=package.stdout.strip()[-1000:])
+                    if package.returncode == 0 and re.search(r'^package:/\S+\.apk\s*$',package.stdout,re.M): break
             except subprocess.TimeoutExpired:
-                pass
+                report['last_boot_readiness']={'error':'Timed out checking boot or PackageManager readiness'}
             assert time.monotonic()-start < a.boot_timeout, 'Disposable emulator boot timeout'
             time.sleep(8)
         report['boot_wait_seconds'] = round(time.monotonic()-start, 1)
         report['android_api'] = adb('shell','getprop','ro.build.version.sdk').stdout.strip()
         report['android_abi'] = adb('shell','getprop','ro.product.cpu.abi').stdout.strip()
-        adb('shell','input','keyevent','82')
+        try:
+            unlock=adb('shell','wm','dismiss-keyguard',timeout=5)
+            report['keyguard_setup']={'exit_code':unlock.returncode,'output':unlock.stdout.strip()[-500:]}
+        except subprocess.TimeoutExpired:
+            report['keyguard_setup']={'status':'TIMEOUT (nonfatal; test windows also show when locked)'}
         for variant in ('baseline','fixed'):
             directory = a.builds / variant
             build = json.loads((directory/'build-result.json').read_text())
@@ -71,7 +79,7 @@ def main():
             package = build['package']; assert package=='app.morphe.wireguard.locale.'+variant
             # These dedicated disposable test IDs never contain target-app data.
             adb('uninstall',package)
-            installed=adb('install','-r',str(directory/'harness.apk'),timeout=90)
+            installed=adb('install','--no-incremental','-r',str(directory/'harness.apk'),timeout=90)
             assert installed.returncode == 0 and 'Success' in installed.stdout, installed.stdout
             keys = sorted(e.get('name') for e in ET.parse(directory/'res/values/strings.xml').getroot())
             for scenario in ('activity-ko-cached-en','activity-ko-unprimed','morphe-ko-cached-en','english-fallback'):

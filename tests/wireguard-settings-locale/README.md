@@ -8,8 +8,9 @@ and profile operations are explicit test collaborators, not a live backend.
 It does not install or validate YouTube/Music, use a provider profile, or test
 AndroidKeyStore, native networking, playback or system VPN coexistence.
 
-The two APKs differ only in the production Activity/base-hook source snapshot.
-Each runs four fresh-process scenarios: Korean Activity with English host and
+Both variants use identical collaborators and resources; the production
+Activity/base-hook snapshots, disposable package IDs and ephemeral signing keys
+distinguish the APKs. Each runs four fresh-process scenarios: Korean Activity with English host and
 cached English strings; the same without priming the cache; Morphe Korean with
 cached English; and an unsupported locale's English fallback with cached Korean.
 The runner requires the old implementation to fail and the fixed one to pass.
