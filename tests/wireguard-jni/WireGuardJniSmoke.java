@@ -45,6 +45,18 @@ public final class WireGuardJniSmoke {
         throw new AssertionError("Expected " + type.getName());
     }
 
+    private static void rejectsProfile(String code, String config) {
+        try {
+            NativeTunnel.validate(config);
+        } catch (NativeTunnel.InvalidProfileException error) {
+            check(code.equals(error.getMessage()), "Wrong native localization code");
+            check(!error.getMessage().contains(key(1))
+                    && !error.getMessage().contains("secret-hook-marker"), "Native code leaked profile data");
+            return;
+        }
+        throw new AssertionError("Expected native profile rejection: " + code);
+    }
+
     private static String request(int port, String auth) throws Exception {
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress("127.0.0.1", port), 1000);
@@ -77,6 +89,27 @@ public final class WireGuardJniSmoke {
                 .replace("DNS = 10.77.0.1", "DNS = fd00:77::1")
                 .replace("AllowedIPs = 10.77.0.0/24", "AllowedIPs = fd00:77::1"));
         checks++;
+        rejectsProfile("invalid_text", "");
+        rejectsProfile("invalid_interface", "[Interface]\n" + config());
+        rejectsProfile("invalid_peer", config() + "[Peer]\n");
+        rejectsProfile("unsupported_section", config().replace("[Interface]", "[Other]"));
+        rejectsProfile("invalid_directive", "[Interface]\nPrivateKey = \n");
+        rejectsProfile("duplicate_directive", config().replace("[Peer]", "MTU = 1420\nMTU = 1420\n[Peer]"));
+        rejectsProfile("invalid_address", config().replace("Address = 10.77.0.2/32", "Address = client.invalid"));
+        rejectsProfile("duplicate_address", config().replace("Address = 10.77.0.2/32",
+                "Address = 10.77.0.2/32, 10.77.0.2/32"));
+        rejectsProfile("invalid_dns", config().replace("DNS = 10.77.0.1", "DNS = dns.invalid"));
+        rejectsProfile("invalid_mtu", config().replace("[Peer]", "MTU = 0\n[Peer]"));
+        rejectsProfile("invalid_endpoint", config().replace("127.0.0.1:51820", "vpn.example:51820"));
+        rejectsProfile("invalid_routes", config().replace("10.77.0.0/24", "10.77.0.0/33"));
+        rejectsProfile("unsupported_directive", config().replace("[Peer]", "PostUp = secret-hook-marker\n[Peer]"));
+        rejectsProfile("invalid_value", config().replace("PrivateKey = ", "PrivateKey = BAD"));
+        rejectsProfile("line_too_long", config() + "#".repeat(4097));
+        rejectsProfile("missing_required", config().replace("PublicKey = ", "# PublicKey = "));
+        rejectsProfile("ipv6_mtu", config().replace("Address = 10.77.0.2/32",
+                "Address = 10.77.0.2/32, fd00:77::2/128").replace("[Peer]", "MTU = 1200\n[Peer]"));
+        rejectsProfile("dns_required", config().replace("DNS = 10.77.0.1\n", ""));
+        rejectsProfile("dns_not_routed", config().replace("DNS = 10.77.0.1", "DNS = 1.1.1.1"));
         rejects(IllegalArgumentException.class, () -> NativeTunnel.validate(null));
         rejects(IllegalArgumentException.class, () -> NativeTunnel.validate(""));
         rejects(IllegalArgumentException.class, () -> NativeTunnel.validate("x".repeat(65537)));

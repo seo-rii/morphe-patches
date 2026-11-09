@@ -24,13 +24,16 @@ const (
 	maxRoutes      = 256
 )
 
-// ConfigError intentionally contains no config values, key material, or file
-// contents. It is safe to display to the user, unlike arbitrary parser errors.
-type ConfigError struct{ Reason string }
+// ConfigError contains a stable localization code and a value-free diagnostic.
+// JNI returns Code; Error keeps the English diagnostic for non-UI callers.
+type ConfigError struct {
+	Code   string
+	Reason string
+}
 
 func (e *ConfigError) Error() string { return e.Reason }
 
-func invalid(reason string) error { return &ConfigError{Reason: reason} }
+func invalid(code, reason string) error { return &ConfigError{Code: code, Reason: reason} }
 
 type config struct {
 	privateKey [32]byte
@@ -58,7 +61,7 @@ func Validate(text string) error {
 
 func parseConfig(text string) (_ *config, resultErr error) {
 	if len(text) == 0 || len(text) > MaxConfigBytes || !utf8.ValidString(text) || strings.ContainsRune(text, '\x00') {
-		return nil, invalid("Configuration must be valid UTF-8 text of at most 64 KiB.")
+		return nil, invalid("invalid_text", "Configuration must be valid UTF-8 text of at most 64 KiB.")
 	}
 	text = strings.TrimPrefix(text, "\ufeff")
 	c := &config{mtu: 1420}
@@ -84,28 +87,28 @@ func parseConfig(text string) (_ *config, resultErr error) {
 			switch strings.ToLower(line) {
 			case "[interface]":
 				if interfaceSeen || peerSeen {
-					return nil, invalid("Exactly one [Interface], followed by one [Peer], is supported.")
+					return nil, invalid("invalid_interface", "Exactly one [Interface], followed by one [Peer], is supported.")
 				}
 				interfaceSeen, section = true, "interface"
 			case "[peer]":
 				if !interfaceSeen || peerSeen {
-					return nil, invalid("Exactly one [Peer] after [Interface] is supported.")
+					return nil, invalid("invalid_peer", "Exactly one [Peer] after [Interface] is supported.")
 				}
 				peerSeen, section = true, "peer"
 			default:
-				return nil, invalid("Configuration contains an unsupported section.")
+				return nil, invalid("unsupported_section", "Configuration contains an unsupported section.")
 			}
 			continue
 		}
 		key, value, ok := strings.Cut(line, "=")
 		key, value = strings.ToLower(strings.TrimSpace(key)), strings.TrimSpace(value)
 		if !ok || section == "" || value == "" {
-			return nil, invalid("Configuration contains an invalid or empty directive.")
+			return nil, invalid("invalid_directive", "Configuration contains an invalid or empty directive.")
 		}
 		fullKey := section + "." + key
 		multi := fullKey == "interface.address" || fullKey == "interface.dns" || fullKey == "peer.allowedips"
 		if seen[fullKey] && !multi {
-			return nil, invalid("Duplicate singleton directives are not supported.")
+			return nil, invalid("duplicate_directive", "Duplicate singleton directives are not supported.")
 		}
 		seen[fullKey] = true
 		var err error
@@ -116,11 +119,11 @@ func parseConfig(text string) (_ *config, resultErr error) {
 			for _, item := range strings.Split(value, ",") {
 				p, parseErr := parsePrefix(strings.TrimSpace(item))
 				if parseErr != nil || !isUnicast(p.Addr()) || len(c.addresses) >= maxAddresses {
-					return nil, invalid("Address must contain at most 8 unicast IPv4/IPv6 addresses with optional CIDR masks.")
+					return nil, invalid("invalid_address", "Address must contain at most 8 unicast IPv4/IPv6 addresses with optional CIDR masks.")
 				}
 				addr := p.Addr().Unmap()
 				if containsAddr(c.addresses, addr) {
-					return nil, invalid("Duplicate interface addresses are not supported.")
+					return nil, invalid("duplicate_address", "Duplicate interface addresses are not supported.")
 				}
 				c.addresses = append(c.addresses, addr)
 			}
@@ -128,7 +131,7 @@ func parseConfig(text string) (_ *config, resultErr error) {
 			for _, item := range strings.Split(value, ",") {
 				addr, parseErr := netip.ParseAddr(strings.TrimSpace(item))
 				if parseErr != nil || !isUnicast(addr) || len(c.dns) >= maxDNS {
-					return nil, invalid("DNS must contain at most 8 numeric unicast IP addresses; search domains are unsupported.")
+					return nil, invalid("invalid_dns", "DNS must contain at most 8 numeric unicast IP addresses; search domains are unsupported.")
 				}
 				addr = addr.Unmap()
 				if !containsAddr(c.dns, addr) {
@@ -140,7 +143,7 @@ func parseConfig(text string) (_ *config, resultErr error) {
 		case "interface.mtu":
 			c.mtu, err = strconv.Atoi(value)
 			if err != nil || c.mtu < 576 || c.mtu > 9000 {
-				return nil, invalid("MTU must be between 576 and 9000 bytes.")
+				return nil, invalid("invalid_mtu", "MTU must be between 576 and 9000 bytes.")
 			}
 		case "peer.publickey":
 			c.publicKey, err = parseKey(value, false)
@@ -150,14 +153,14 @@ func parseConfig(text string) (_ *config, resultErr error) {
 		case "peer.endpoint":
 			c.endpoint, err = netip.ParseAddrPort(value)
 			if err != nil || !isUnicast(c.endpoint.Addr()) || c.endpoint.Port() == 0 {
-				return nil, invalid("Endpoint must be numeric IPv4:port or [IPv6]:port. Hostnames are unsupported in this version.")
+				return nil, invalid("invalid_endpoint", "Endpoint must be numeric IPv4:port or [IPv6]:port. Hostnames are unsupported in this version.")
 			}
 			c.endpoint = netip.AddrPortFrom(c.endpoint.Addr().Unmap(), c.endpoint.Port())
 		case "peer.allowedips":
 			for _, item := range strings.Split(value, ",") {
 				p, parseErr := parsePrefix(strings.TrimSpace(item))
 				if parseErr != nil || p.Addr().Zone() != "" || p.Addr().Is4In6() || len(c.routes) >= maxRoutes {
-					return nil, invalid("AllowedIPs must contain at most 256 valid IPv4/IPv6 addresses or CIDR routes.")
+					return nil, invalid("invalid_routes", "AllowedIPs must contain at most 256 valid IPv4/IPv6 addresses or CIDR routes.")
 				}
 				c.routes = append(c.routes, p.Masked())
 			}
@@ -170,29 +173,29 @@ func parseConfig(text string) (_ *config, resultErr error) {
 		default:
 			// In particular: do not execute PreUp/PostUp/PreDown/PostDown;
 			// do not silently ignore Table, FwMark, SaveConfig or Amnezia keys.
-			return nil, invalid("Unsupported directive. Shell hooks, routing-table options, and non-WireGuard extensions are not accepted.")
+			return nil, invalid("unsupported_directive", "Unsupported directive. Shell hooks, routing-table options, and non-WireGuard extensions are not accepted.")
 		}
 		if err != nil {
-			return nil, invalid("A key or numeric configuration value is invalid.")
+			return nil, invalid("invalid_value", "A key or numeric configuration value is invalid.")
 		}
 	}
 	if scanner.Err() != nil {
-		return nil, invalid("Configuration contains a line longer than 4 KiB.")
+		return nil, invalid("line_too_long", "Configuration contains a line longer than 4 KiB.")
 	}
 	if !interfaceSeen || !peerSeen || !seen["interface.privatekey"] || !seen["peer.publickey"] || !seen["peer.endpoint"] || len(c.addresses) == 0 || len(c.routes) == 0 {
-		return nil, invalid("PrivateKey, Address, PublicKey, Endpoint and AllowedIPs are required.")
+		return nil, invalid("missing_required", "PrivateKey, Address, PublicKey, Endpoint and AllowedIPs are required.")
 	}
 	for _, addr := range c.addresses {
 		if addr.Is6() && c.mtu < 1280 {
-			return nil, invalid("IPv6 requires an MTU of at least 1280 bytes.")
+			return nil, invalid("ipv6_mtu", "IPv6 requires an MTU of at least 1280 bytes.")
 		}
 	}
 	if len(c.dns) == 0 {
-		return nil, invalid("At least one DNS server is required; system DNS fallback is disabled.")
+		return nil, invalid("dns_required", "At least one DNS server is required; system DNS fallback is disabled.")
 	}
 	for _, addr := range c.dns {
 		if !c.hasFamily(addr) || !c.allows(addr) {
-			return nil, invalid("Every DNS server must have a configured address family and be covered by AllowedIPs.")
+			return nil, invalid("dns_not_routed", "Every DNS server must have a configured address family and be covered by AllowedIPs.")
 		}
 	}
 	return c, nil

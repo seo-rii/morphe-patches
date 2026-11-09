@@ -4,6 +4,7 @@ package wireguard
 
 import (
 	"encoding/base64"
+	"errors"
 	"net/netip"
 	"strings"
 	"testing"
@@ -145,6 +146,49 @@ func TestValidateRejectsUnsupportedOrUnsafeConfig(t *testing.T) {
 			}
 			if strings.Contains(err.Error(), "touch") || strings.Contains(err.Error(), "AQIDBA") || strings.Contains(err.Error(), "vpn.example") {
 				t.Fatal("validation error leaked a config value")
+			}
+		})
+	}
+}
+
+func TestValidationErrorsHaveStableLocalizationCodes(t *testing.T) {
+	config := fixtureConfig()
+	cases := map[string]string{
+		"invalid_text":          config + "\x00",
+		"invalid_interface":     "[Interface]\n" + config,
+		"invalid_peer":          config + "[Peer]\n",
+		"unsupported_section":   strings.Replace(config, "[Interface]", "[Other]", 1),
+		"invalid_directive":     "[Interface]\nPrivateKey = \n",
+		"duplicate_directive":   strings.Replace(config, "[Peer]", "MTU = 1420\nMTU = 1420\n[Peer]", 1),
+		"invalid_address":       strings.Replace(config, "Address = 10.77.0.2/32", "Address = client.invalid", 1),
+		"duplicate_address":     strings.Replace(config, "Address = 10.77.0.2/32", "Address = 10.77.0.2/32, 10.77.0.2/32", 1),
+		"invalid_dns":           strings.Replace(config, "DNS = 10.77.0.1", "DNS = dns.invalid", 1),
+		"invalid_mtu":           strings.Replace(config, "[Peer]", "MTU = 0\n[Peer]", 1),
+		"invalid_endpoint":      strings.Replace(config, "127.0.0.1:51820", "vpn.example:51820", 1),
+		"invalid_routes":        strings.Replace(config, "10.77.0.0/24", "10.77.0.0/33", 1),
+		"unsupported_directive": strings.Replace(config, "[Peer]", "PostUp = secret-hook-marker\n[Peer]", 1),
+		"invalid_value":         strings.Replace(config, "PrivateKey = ", "PrivateKey = BAD", 1),
+		"line_too_long":         config + strings.Repeat("#", maxConfigLine+1),
+		"missing_required":      strings.Replace(config, "PublicKey = ", "# PublicKey = ", 1),
+		"ipv6_mtu": strings.NewReplacer("Address = 10.77.0.2/32", "Address = 10.77.0.2/32, fd00:77::2/128",
+			"[Peer]", "MTU = 1200\n[Peer]").Replace(config),
+		"dns_required":   strings.Replace(config, "DNS = 10.77.0.1\n", "", 1),
+		"dns_not_routed": strings.Replace(config, "DNS = 10.77.0.1", "DNS = 1.1.1.1", 1),
+	}
+	for code, text := range cases {
+		t.Run(code, func(t *testing.T) {
+			err := Validate(text)
+			var configErr *ConfigError
+			if !errors.As(err, &configErr) || configErr.Code != code {
+				t.Fatalf("expected localization code %q, got %v", code, err)
+			}
+			if configErr.Reason == "" || err.Error() != configErr.Reason || configErr.Reason == code {
+				t.Fatal("non-UI diagnostic was lost")
+			}
+			for _, marker := range []string{"secret-hook-marker", "AQIDBA", "vpn.example", "client.invalid", "dns.invalid"} {
+				if strings.Contains(configErr.Code, marker) || strings.Contains(configErr.Reason, marker) {
+					t.Fatal("validation diagnostic contains profile data")
+				}
 			}
 		})
 	}

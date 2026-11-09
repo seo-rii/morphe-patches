@@ -98,7 +98,7 @@ def main():
         resource_names = [item.attrib["name"] for item in resources.findall("string")]
         required = {"morphe_wireguard_settings_title", "morphe_wireguard_settings_summary"}
         for source in (repo / "extensions/shared-youtube/library/src/main/java/app/morphe/extension/shared/wireguard").glob("*.java"):
-            required.update(re.findall(r'"(morphe_wireguard_[a-z_]+)"', source.read_text()))
+            required.update(re.findall(r'"(morphe_wireguard_[a-z0-9_]+)"', source.read_text()))
         require(required <= set(resource_names), "Some WireGuard UI strings are missing from bundle")
         require(all(resource_names.count(name) == 1 for name in required), "Duplicate WireGuard strings")
         print(f"PASS UI resources: {len(required)} keys; original and dependency notices present")

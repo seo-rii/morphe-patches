@@ -23,10 +23,10 @@ public final class NativeTunnel {
     /** Checks a profile without making network connections or executing configuration hooks. */
     public static native void validate(String config);
 
-    /** JNI validation supplies fixed diagnostic text, never profile values or parser causes. */
+    /** JNI validation supplies stable diagnostic codes, never profile values or parser causes. */
     public static final class InvalidProfileException extends IllegalArgumentException {
-        public InvalidProfileException(String message) {
-            super(message);
+        public InvalidProfileException(String code) {
+            super(code);
         }
     }
 }

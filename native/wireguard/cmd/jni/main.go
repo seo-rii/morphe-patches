@@ -61,8 +61,12 @@ func morphe_wg_stop() {
 //export morphe_wg_validate
 func morphe_wg_validate(config *C.char) *C.char {
 	if err := wg.Validate(C.GoString(config)); err != nil {
-		// Validate only returns deliberately sanitized ConfigError messages.
-		return C.CString(err.Error())
+		// The Java UI maps only known codes to localized resources.
+		var configErr *wg.ConfigError
+		if errors.As(err, &configErr) {
+			return C.CString(configErr.Code)
+		}
+		return C.CString("invalid_config")
 	}
 	return nil
 }

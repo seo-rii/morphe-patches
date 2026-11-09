@@ -25,7 +25,8 @@ public class ProfileOperationsBoundaryTest {
                 public class ImportProbe {
                     public static final String ORIGINAL = "previous-public-test-profile";
                     public static final String PRIVATE_MARKER = "synthetic-private-value-not-a-real-key";
-                    public static final String REASON = "Exactly one [Peer] after [Interface] is supported.";
+                    public static final String REASON = "invalid_peer";
+                    public static final String REASON_KEY = "morphe_wireguard_error_invalid_peer";
                     public static final List<String> events = new ArrayList<>();
                     public static String saved = ORIGINAL, expected;
                     public static int nativeLoads, validations, saves, loads;
@@ -117,8 +118,14 @@ public class ProfileOperationsBoundaryTest {
     @Test public void emptyDocumentHasContentDiagnosticBeforeNativeLoad() throws Throwable { run("empty"); }
     @Test public void blankDocumentHasContentDiagnosticBeforeNativeLoad() throws Throwable { run("blank"); }
     @Test public void embeddedNulHasContentDiagnosticBeforeNativeLoad() throws Throwable { run("nul"); }
-    @Test public void typedNativeReasonIsShownWithoutRetainingCause() throws Throwable { run("typedValidation"); }
+    @Test public void typedNativeCodeSelectsResourceKeyWithoutRetainingCause() throws Throwable { run("typedValidation"); }
     @Test public void untrustedNativeArgumentMessageIsNotShownOrRetained() throws Throwable { run("argumentValidation"); }
+    @Test public void everyKnownNativeCodeSelectsATranslatableResource() throws Throwable { run("knownCodes"); }
+    @Test public void unknownNativeCodeFallsBackWithoutRawText() throws Throwable { run("unknownTyped"); }
+    @Test public void nullNativeCodeFallsBackWithoutRawText() throws Throwable { run("nullTyped"); }
+    @Test public void legacyEnglishNativeMessageIsNotDisplayed() throws Throwable { run("legacyTyped"); }
+    @Test public void privateNativeMessageIsNotDisplayedOrRetained() throws Throwable { run("privateTyped"); }
+    @Test public void nativePayloadCannotChooseAnArbitraryResource() throws Throwable { run("resourceTyped"); }
     @Test public void missingNativeLibraryAndPoisonedClassHaveSameNativeDiagnostic() throws Throwable { run("nativeMissing"); }
     @Test public void storageIoFailureKeepsPreviousProfileAndHasStorageDiagnostic() throws Throwable { run("storeIo"); }
     @Test public void keyStoreFailureKeepsPreviousProfileAndHasStorageDiagnostic() throws Throwable { run("storeSecurity"); }
@@ -155,13 +162,13 @@ public class ProfileOperationsBoundaryTest {
                         throw new AssertionError("Expected profile operation failure");
                     } catch (ProfileOperations.Failure error) {
                         check(error.resourceKey.equals("morphe_wireguard_" + key), "Wrong diagnostic stage");
-                        check(Objects.equals(error.validationReason, reason), "Wrong validation detail");
+                        check(Objects.equals(error.validationReasonKey, reason), "Wrong validation detail");
                         check(error.getCause() == null, "Failure retained private cause");
                         check(error.getSuppressed().length == 0, "Failure retained suppressed cause");
                         StringWriter output = new StringWriter();
                         error.printStackTrace(new PrintWriter(output));
                         check(!output.toString().contains(ImportProbe.PRIVATE_MARKER), "Diagnostic leaked profile data");
-                        check(!String.valueOf(error.validationReason).contains(ImportProbe.PRIVATE_MARKER),
+                        check(!String.valueOf(error.validationReasonKey).contains(ImportProbe.PRIVATE_MARKER),
                                 "Validation detail leaked profile data");
                     }
                 }
@@ -243,8 +250,43 @@ public class ProfileOperationsBoundaryTest {
                         ImportProbe.validationFailure = reason == null
                                 ? new IllegalArgumentException(ImportProbe.PRIVATE_MARKER)
                                 : new NativeTunnel.InvalidProfileException(reason);
-                        reject("validation_failed", reason, () -> importText(PROFILE));
+                        reject("validation_failed", reason == null ? null : ImportProbe.REASON_KEY,
+                                () -> importText(PROFILE));
                         check(ImportProbe.validations == 1 && ImportProbe.saves == 0, "Invalid profile reached storage");
+                        check(ImportProbe.saved.equals(ImportProbe.ORIGINAL), "Previous profile changed");
+                        return;
+                    }
+                    if (scenario.equals("knownCodes")) {
+                        String[] codes = {"invalid_text", "invalid_interface", "invalid_peer", "unsupported_section",
+                                "invalid_directive", "duplicate_directive", "invalid_address", "duplicate_address",
+                                "invalid_dns", "invalid_mtu", "invalid_endpoint", "invalid_routes", "unsupported_directive",
+                                "invalid_value", "line_too_long", "missing_required", "ipv6_mtu", "dns_required", "dns_not_routed"};
+                        for (String code : codes) {
+                            ImportProbe.validations = 0;
+                            ImportProbe.closed = false;
+                            ImportProbe.validationFailure = new NativeTunnel.InvalidProfileException(code);
+                            reject("validation_failed", "morphe_wireguard_error_" + code, () -> importText(PROFILE));
+                            check(ImportProbe.validations == 1 && ImportProbe.saves == 0,
+                                    "Native validation failure reached storage");
+                            check(ImportProbe.closed, "Validation failure did not close the document");
+                            check(ImportProbe.saved.equals(ImportProbe.ORIGINAL), "Previous profile changed");
+                        }
+                        return;
+                    }
+                    if (List.of("unknownTyped", "nullTyped", "legacyTyped", "privateTyped", "resourceTyped")
+                            .contains(scenario)) {
+                        String payload = switch (scenario) {
+                            case "unknownTyped" -> "future_unknown_code";
+                            case "nullTyped" -> null;
+                            case "legacyTyped" -> "Exactly one [Peer] after [Interface] is supported.";
+                            case "privateTyped" -> ImportProbe.PRIVATE_MARKER;
+                            default -> "morphe_wireguard_error_invalid_peer";
+                        };
+                        ImportProbe.validationFailure = new NativeTunnel.InvalidProfileException(payload);
+                        reject("validation_failed", null, () -> importText(PROFILE));
+                        check(ImportProbe.validations == 1 && ImportProbe.saves == 0,
+                                "Unknown native payload reached storage");
+                        check(ImportProbe.closed, "Unknown native payload did not close the document");
                         check(ImportProbe.saved.equals(ImportProbe.ORIGINAL), "Previous profile changed");
                         return;
                     }
