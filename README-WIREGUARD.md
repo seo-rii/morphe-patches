@@ -7,10 +7,17 @@ Morphe Patches v2.1.0에 YouTube와 YouTube Music용 앱 내부 WireGuard 프록
 백포팅했으며 최신 upstream 전체를 덮어쓰지 않았습니다.
 
 관리자는 v2.1.1을 실제 Android 기기에서 잘 사용했다고 확인했습니다(2026-11-07).
-이 경험과 v2.1.4 자동화 검증은 구분합니다. 새 UI의 기기 화면 확인, 실제 서버
-handshake, 재생, DNS 경로 및 Wi-Fi/모바일 전환은 새로 실행한 것으로 간주하지
-않습니다. [이번 변경 및 검증 기록](docs/wireguard-i18n-2.1.4.md)과
+이 경험과 v2.1.5 자동화 검증은 구분합니다. 실제 YouTube/Music 앱의 UI 확인, 서버 handshake, 재생, DNS 경로 및
+Wi-Fi/모바일 전환은 독립된 화면 하네스 검증과 구분하며 새로 실행한 것으로
+간주하지 않습니다. [이번 변경 및 검증 기록](docs/wireguard-i18n-2.1.5.md)과
 [기기 검증 절차](docs/wireguard-device-acceptance.md)를 참고하세요.
+
+## v2.1.5 변경
+
+- 진입 메뉴와 내부 화면의 언어가 달라질 수 있던 문자열 조회 경로를 수정합니다.
+  내부 제목·설정 행·상태·대화상자·토스트는 현재 화면의 언어 컨텍스트를 사용하며
+  다른 화면에서 먼저 캐시한 영어 문자열을 재사용하지 않습니다.
+- 기존 Morphe 언어/재시작 규칙, 8개 언어 번역, 암호화된 프로필과 전송 구조는 유지합니다.
 
 ## v2.1.4 변경
 
@@ -96,11 +103,11 @@ WebView, Cast, GmsCore 및 별도 프로세스는 추가 검증 대상입니다.
 네이티브 payload는 Gradle의 `processResources` 전에 소스에서 자동으로 만듭니다.
 Go 1.26.10, Android NDK 28.2.13676358, API 26이 필요합니다. 산출물은
 `native/wireguard/build/android/<abi>/libmorphewireguard.so`와
-`patches/build/libs/patches-2.1.4.mpp`입니다.
+`patches/build/libs/patches-2.1.5.mpp`입니다.
 
 최종 번들 생성 뒤 JVM/Android DEX 기본 선택을 모두 확인합니다.
 `scripts/set-wireguard-defaults.py verify`는 검사용으로만 사용할 수 있습니다.
-역사적인 v2.1.2 재패키징용 `repair`는 v2.1.4 빌드 경로가 아닙니다.
+역사적인 v2.1.2 재패키징용 `repair`는 v2.1.5 빌드 경로가 아닙니다.
 
 [네이티브 설명](native/wireguard/README.md)에 프로필 문법, Go/JNI 테스트 및
 실패 정책을, [기기 체크리스트](docs/wireguard-device-acceptance.md)에 **예상 결과**와
