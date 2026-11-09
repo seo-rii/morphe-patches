@@ -55,3 +55,10 @@ English fallback as evidence of translation. This verifies compiled values;
 Android rendering and language switching remain device checks. See the
 [v2.1.4 release record](wireguard-i18n-2.1.4.md) for results. Published v2.1.3
 assets and its corresponding source remain unchanged.
+
+
+The optional [standalone Android locale regression](../tests/wireguard-settings-locale/README.md) compares the
+production screen before/after the fix with an English host or stale cache. Its
+backend collaborators are explicit stubs; it does not replace target-app testing.
+The test source is shared by both streams and accepts external Korean resources
+without modifying Crowdin-managed product files.
