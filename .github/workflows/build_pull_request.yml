@@ -2,6 +2,12 @@ name: Build pull request
 
 on:
   workflow_dispatch:
+    inputs:
+      wireguard_locale_test:
+        description: 'Run only the standalone WireGuard Activity locale regression on an accelerated disposable emulator'
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - dev
@@ -11,6 +17,7 @@ on:
 
 jobs:
   release:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.wireguard_locale_test }}
     name: Build
     runs-on: ubuntu-latest
     steps:
@@ -67,3 +74,250 @@ jobs:
         with:
           archive: false
           path: patches/build/libs
+
+  wireguard_locale:
+    name: WireGuard standalone Android locale regression
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.wireguard_locale_test }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout the explicitly dispatched source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout the pinned public extension library
+        uses: actions/checkout@v7
+        with:
+          repository: MorpheApp/morphe-patches-library
+          ref: 11f8c7e4d9dd64e18b0594d2c7cbf09176a65327
+          path: .wireguard-locale-library
+          persist-credentials: false
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Check prerequisites and initialize private disposable paths
+        run: |
+          umask 077
+          wireguard_ci="$RUNNER_TEMP/wireguard-locale-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test ! -e "$wireguard_ci"
+          mkdir -m 0700 "$wireguard_ci"
+          mkdir -m 0700 "$wireguard_ci/evidence" "$wireguard_ci/logs" "$wireguard_ci/avd" "$wireguard_ci/user" "$wireguard_ci/emulator"
+          printf 'WIREGUARD_LOCALE_CI=%s\n' "$wireguard_ci" >> "$GITHUB_ENV"
+          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          test -r /dev/kvm && test -w /dev/kvm
+          python3 - <<'PY'
+          import os, shutil
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          free = shutil.disk_usage(root).free
+          assert free >= 12 * 1024**3, f'At least 12 GiB free disk required; found {free} bytes'
+          fd = os.open('/dev/kvm', os.O_RDWR)
+          os.close(fd)
+          PY
+          test "$(git -C .wireguard-locale-library rev-parse HEAD)" = 11f8c7e4d9dd64e18b0594d2c7cbf09176a65327
+          git cat-file -e dc3819a6920bef55b71bb8708378e3dcb01f6497^{commit}
+
+      - name: Install normal Android SDK inputs
+        timeout-minutes: 10
+        run: |
+          umask 077
+          python3 - <<'PY'
+          import os, subprocess
+          from pathlib import Path
+          root = Path(os.environ['WIREGUARD_LOCALE_CI'])
+          sdk = Path(os.environ['ANDROID_HOME'])
+          command = [str(sdk/'cmdline-tools/latest/bin/sdkmanager'), '--install',
+                     'platforms;android-36', 'build-tools;36.0.0', 'platform-tools',
+                     'emulator', 'system-images;android-35;google_apis;x86_64']
+          with (root/'logs/sdk-install.log').open('xb') as log:
+              result = subprocess.run(command, input=b'y\n'*100, stdout=log, stderr=subprocess.STDOUT, timeout=540)
+          (root/'logs/sdk-install.exit').write_text(str(result.returncode)+'\n')
+          assert result.returncode == 0, 'SDK installation failed; see bounded artifact log'
+          PY
+          "$ANDROID_HOME/emulator/emulator" -accel-check > "$WIREGUARD_LOCALE_CI/logs/accel-check.txt" 2>&1
+          "$ANDROID_HOME/emulator/emulator" -version > "$WIREGUARD_LOCALE_CI/logs/emulator-version.txt" 2>&1
+
+      - name: Fetch and verify the external Korean test resources
+        run: |
+          umask 077
+          python3 - <<'PY'
+          import hashlib, json, os, urllib.request
+          from pathlib import Path
+          root = Path(os.environ['WIREGUARD_LOCALE_CI'])
+          commit = '8a87d95bf51a90b2206c5fa1b414316b06c539cb'
+          path = 'patches/src/main/resources/addresources/values-ko-rKR/shared-youtube/strings.xml'
+          url = 'https://raw.githubusercontent.com/seo-rii/morphe-patches/'+commit+'/'+path
+          with urllib.request.urlopen(url, timeout=45) as response:
+              assert response.status == 200
+              contents = response.read(128*1024+1)
+          digest = hashlib.sha256(contents).hexdigest()
+          assert len(contents) == 40667 and digest == '89ba443ac2720031764c88c3d5d7d222bc15728152fc674a9135f48878d10e2a'
+          (root/'korean.xml').write_bytes(contents)
+          (root/'evidence/korean-source.json').write_text(json.dumps({'url':url,'commit':commit,'sha256':digest,'bytes':len(contents)},indent=2)+'\n')
+          PY
+
+      - name: Build baseline and fixed standalone test APKs
+        timeout-minutes: 5
+        run: |
+          umask 077
+          mkdir -m 0700 "$WIREGUARD_LOCALE_CI/builds"
+          for wireguard_variant in baseline fixed; do
+            wireguard_args=()
+            if [ "$wireguard_variant" = baseline ]; then
+              wireguard_args=(--baseline-commit dc3819a6920bef55b71bb8708378e3dcb01f6497)
+            fi
+            python3 tests/wireguard-settings-locale/build_harness.py \
+              --source "$GITHUB_WORKSPACE" --library "$GITHUB_WORKSPACE/.wireguard-locale-library" \
+              --korean-resources "$WIREGUARD_LOCALE_CI/korean.xml" \
+              --sdk "$ANDROID_HOME" --jdk "$JAVA_HOME" \
+              --variant "$wireguard_variant" "${wireguard_args[@]}" \
+              --output "$WIREGUARD_LOCALE_CI/builds/$wireguard_variant" \
+              > "$WIREGUARD_LOCALE_CI/logs/build-$wireguard_variant.log" 2>&1
+          done
+
+      - name: Boot an owned accelerated emulator and run eight UI cases
+        timeout-minutes: 20
+        run: |
+          umask 077
+          export ANDROID_AVD_HOME="$WIREGUARD_LOCALE_CI/avd"
+          export ANDROID_USER_HOME="$WIREGUARD_LOCALE_CI/user"
+          export ANDROID_EMULATOR_HOME="$WIREGUARD_LOCALE_CI/emulator"
+          printf 'no\n' | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
+            --name wireguard-settings-locale-ci --package 'system-images;android-35;google_apis;x86_64' \
+            --device pixel_2 --path "$ANDROID_AVD_HOME/wireguard-settings-locale-ci.avd" \
+            > "$WIREGUARD_LOCALE_CI/logs/avd-create.log" 2>&1
+          python3 - <<'PY'
+          import json, os, signal, subprocess, time
+          from pathlib import Path
+          root = Path(os.environ['WIREGUARD_LOCALE_CI'])
+          sdk = Path(os.environ['ANDROID_HOME'])
+          command = [str(sdk/'emulator/emulator'), '-avd', 'wireguard-settings-locale-ci',
+                     '-port', '5584', '-no-window', '-no-audio', '-no-snapshot',
+                     '-no-boot-anim', '-gpu', 'swiftshader', '-accel', 'on', '-cores', '2', '-memory', '2048']
+          def start_ticks(pid):
+              return Path('/proc/'+str(pid)+'/stat').read_text().rsplit(')',1)[1].split()[19]
+          def interrupt(signum, frame):
+              raise InterruptedError('Workflow signal '+str(signum))
+          signal.signal(signal.SIGTERM, interrupt)
+          signal.signal(signal.SIGINT, interrupt)
+          emulator = None
+          runner = None
+          try:
+              with (root/'logs/emulator.log').open('xb') as emulog:
+                  emulator = subprocess.Popen(command, stdout=emulog, stderr=subprocess.STDOUT, start_new_session=True)
+              identity = {'pid':emulator.pid,'start_ticks':start_ticks(emulator.pid),'command':command}
+              (root/'owned-emulator.json').write_text(json.dumps(identity,indent=2)+'\n')
+              cli = ['python3','tests/wireguard-settings-locale/run_harness.py',
+                     '--adb',str(sdk/'platform-tools/adb'),'--serial','emulator-5584',
+                     '--builds',str(root/'builds'),'--output',str(root/'results'),
+                     '--boot-timeout','300','--case-timeout','90',
+                     '--owned-vm-dir',str(root/'avd'),
+                     '--max-allocated-bytes',str(8*1024**3),
+                     '--max-ram-backing-bytes',str(3*1024**3)]
+              with (root/'logs/runtime.log').open('xb') as runlog:
+                  runner = subprocess.Popen(cli, stdout=runlog, stderr=subprocess.STDOUT, start_new_session=True)
+                  code = runner.wait(timeout=1080)
+              (root/'logs/runtime.exit').write_text(str(code)+'\n')
+              assert code == 0, 'Standalone runtime harness failed; inspect bounded artifacts'
+          finally:
+              for name, process in [('runner',runner),('emulator',emulator)]:
+                  if process is None: continue
+                  if process.poll() is None:
+                      os.killpg(process.pid, signal.SIGTERM)
+                      try: process.wait(timeout=20)
+                      except subprocess.TimeoutExpired:
+                          os.killpg(process.pid, signal.SIGKILL)
+                          process.wait(timeout=10)
+                  (root/('logs/'+name+'-final.exit')).write_text(str(process.returncode)+'\n')
+          PY
+
+      - name: Always clean up only the recorded emulator
+        if: ${{ always() }}
+        run: |
+          python3 - <<'PY'
+          import json, os, signal, time
+          from pathlib import Path
+          configured = os.environ.get('WIREGUARD_LOCALE_CI')
+          if not configured: raise SystemExit(0)
+          identity = Path(configured)/'owned-emulator.json'
+          if not identity.exists(): raise SystemExit(0)
+          info = json.loads(identity.read_text())
+          status = Path('/proc/'+str(info['pid'])+'/stat')
+          def owned_live():
+              try: fields = status.read_text().rsplit(')',1)[1].split()
+              except FileNotFoundError: return False
+              return fields[0] != 'Z' and fields[19] == info['start_ticks']
+          if owned_live():
+              os.killpg(info['pid'],signal.SIGTERM)
+              deadline = time.monotonic()+20
+              while owned_live() and time.monotonic() < deadline:
+                  time.sleep(0.25)
+              if owned_live():
+                  os.killpg(info['pid'],signal.SIGKILL)
+                  deadline = time.monotonic()+5
+                  while owned_live() and time.monotonic() < deadline: time.sleep(0.1)
+              assert not owned_live(), 'Owned emulator did not exit; do not inspect a running log'
+          PY
+
+      - name: Collect bounded diagnostic and provenance artifacts
+        if: ${{ always() }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          configured = os.environ.get('WIREGUARD_LOCALE_CI')
+          if not configured: raise SystemExit(0)
+          root = Path(configured)
+          out = root/'evidence'
+          out.mkdir(mode=0o700,exist_ok=True)
+          paths = [*root.glob('builds/*/build-result.json'),*root.glob('results/*.json'),
+                   *root.glob('results/*.txt'),*root.glob('logs/*.exit'),*root.glob('logs/*.txt')]
+          for source in paths:
+              if source.is_file():
+                  data = source.read_bytes()
+                  assert len(data) <= 128*1024, 'Unexpectedly large result artifact: '+source.name
+                  (out/source.relative_to(root).as_posix().replace('/','--')).write_bytes(data)
+          for source in root.glob('logs/*.log'):
+              with source.open('rb') as stream:
+                  stream.seek(max(0,source.stat().st_size-32*1024))
+                  data = stream.read(32*1024)
+              (out/(source.stem+'-tail.txt')).write_bytes(data)
+          provenance = {'scope':'Standalone production Activity/base hook with collaborator stubs; not target-app/network acceptance',
+                        'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+                        'baseline_commit':'dc3819a6920bef55b71bb8708378e3dcb01f6497',
+                        'library_commit':'11f8c7e4d9dd64e18b0594d2c7cbf09176a65327',
+                        'system_image':'system-images;android-35;google_apis;x86_64',
+                        'gpu':'swiftshader','acceleration':'KVM required','vcpus':2,'guest_ram_mb':2048,
+                        'normal_avd_storage':True,'sdk_or_system_image_patched':False}
+          (out/'ci-provenance.json').write_text(json.dumps(provenance,indent=2)+'\n')
+          sdk = Path(os.environ['ANDROID_HOME'])
+          tools = {}
+          for relative in ['system-images/android-35/google_apis/x86_64/source.properties',
+                           'emulator/source.properties','platform-tools/source.properties',
+                           'platforms/android-36/source.properties','build-tools/36.0.0/source.properties']:
+              source = sdk/relative
+              if source.is_file(): tools[relative] = source.read_text()
+          (out/'sdk-package-properties.json').write_text(json.dumps(tools,indent=2)+'\n')
+          assert sum(p.stat().st_size for p in out.iterdir() if p.is_file()) < 2*1024**2
+          PY
+
+      - name: Upload bounded UI evidence
+        if: ${{ always() && env.WIREGUARD_LOCALE_CI != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: wireguard-settings-locale-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: ${{ env.WIREGUARD_LOCALE_CI }}/evidence
