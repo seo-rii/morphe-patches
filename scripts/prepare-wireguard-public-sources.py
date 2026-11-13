@@ -8,7 +8,7 @@ import subprocess
 
 SOURCES = {
     "morphe-patches-gradle-plugin": "5b7e4619931a8c78b7858e598e002222d37021b9",
-    "morphe-patches-library": "11f8c7e4d9dd64e18b0594d2c7cbf09176a65327",
+    "morphe-patches-library": "538d9a6574cbacb4ca66d8b687c44d93b2d8d470",
     "morphe-patcher": "d19545e8505e0329cc640723cb8ff91eddd3cd05",
     "ARSCLib": "675bed2de397097400ba6f0c808e28005ae5aa53",
 }
