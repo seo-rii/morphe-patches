@@ -14702,6 +14702,150 @@
         }
       ],
       "options": []
+    },
+    {
+      "name": "WireGuard proxy (experimental)",
+      "description": "Imports a WireGuard configuration and routes supported app requests through an authenticated app-local proxy, without Android VPN permission. Targets the YouTube Music versions listed in this bundle and requires a 64-bit APK. Root mounting is not supported. This is an unofficial, unverified-on-device prototype, not a system-wide VPN or kill switch.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.google.android.apps.youtube.music",
+          "name": "YouTube Music",
+          "description": null,
+          "apkFileType": "APK_REQUIRED",
+          "appIconColor": "#FF0000",
+          "signatures": [
+            "6a2f65ec694a6a632acdcb5080912a565f903d4b8d83f0eb8e44fbdf2660d8e1",
+            "a2a1ad7ba7f41dfca4514e2afeb90691719af6d0fdbed4b09bbf0ed897701ceb"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "9.45.51",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": 26,
+              "description": null
+            },
+            {
+              "version": "9.44.52",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": 26,
+              "description": null
+            },
+            {
+              "version": "9.43.51",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": 26,
+              "description": null
+            },
+            {
+              "version": "9.30.53",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 26,
+              "description": null
+            },
+            {
+              "version": "9.20.53",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 26,
+              "description": null
+            },
+            {
+              "version": "9.15.51",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 26,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "WireGuard proxy (experimental)",
+      "description": "Imports a WireGuard configuration and routes supported app requests through an authenticated app-local proxy, without Android VPN permission. Requires a 64-bit YouTube 20.47.62 or newer APK. Root mounting is not supported. This is an unofficial, unverified-on-device prototype, not a system-wide VPN or kill switch.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.google.android.youtube",
+          "name": "YouTube",
+          "description": null,
+          "apkFileType": "APK_REQUIRED",
+          "appIconColor": "#FF0033",
+          "signatures": [
+            "5aad2bee6db95d17e05a08d7d1e64c10a1511879154483916b6ae6c7fd9cb0c6",
+            "3d7a1223019aa39d9ea0e3436ab7c0896bfb4fb679f4de5fe7c23f326c8f994a"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "21.45.82",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": 29,
+              "description": null
+            },
+            {
+              "version": "21.44.528",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": 29,
+              "description": null
+            },
+            {
+              "version": "21.43.523",
+              "versionCodes": null,
+              "isExperimental": true,
+              "minSdk": 29,
+              "description": null
+            },
+            {
+              "version": "21.30.216",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 29,
+              "description": null
+            },
+            {
+              "version": "21.28.208",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 29,
+              "description": null
+            },
+            {
+              "version": "21.23.492",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 28,
+              "description": null
+            },
+            {
+              "version": "20.51.39",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 28,
+              "description": null
+            },
+            {
+              "version": "20.26.46",
+              "versionCodes": null,
+              "isExperimental": false,
+              "minSdk": 26,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
     }
   ]
 }
