@@ -25,7 +25,7 @@ Crowdin already maps the entire English shared-youtube file to
 registration change is needed. Korean source resources use `values-ko-rKR` and
 are copied into the target APK's `values-ko` configuration.
 
-The custom v2.1.4 distribution contains 60 English WireGuard strings plus
+The custom distribution contains 60 English WireGuard strings plus
 complete manual translations for Korean, Japanese, simplified/traditional
 Chinese, Spanish, French, German and Brazilian Portuguese. These custom-only
 locale edits were explicitly authorized by the distributor. The official
@@ -43,7 +43,7 @@ The custom release also verifies the real production translations against actual
 compiled APK resources. Run the following after patching the target APKs:
 
 ```sh
-python3 scripts/verify-wireguard-locales.py patches/build/libs/patches-2.1.5.mpp \
+python3 scripts/verify-wireguard-locales.py patches/build/libs/patches-2.2.0.mpp \
   --aapt2 "$ANDROID_HOME/build-tools/36.0.0/aapt2" \
   --apk /path/to/patched-youtube.apk --apk /path/to/patched-music.apk \
   --output /path/to/compiled-locales.json

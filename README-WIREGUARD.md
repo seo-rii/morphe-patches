@@ -1,18 +1,32 @@
 # App-local WireGuard preview — 비공식 Morphe 수정본
 
-Morphe Patches v2.1.0에 YouTube와 YouTube Music용 앱 내부 WireGuard 프록시를
-추가한 **비공식 실험 배포판**입니다. MorpheApp 또는 Proton의 공식 제품이 아닙니다.
-기존 기반 커밋 `8fa2c7a1a832498de8f179748998a3ca87e198eb`과 해당 버전의
-다른 패치는 유지합니다. upstream 기여용 브랜치에서 확인한 WireGuard 관련 수정만
-백포팅했으며 최신 upstream 전체를 덮어쓰지 않았습니다.
+공식 Morphe Patches v2.2.0에 YouTube와 YouTube Music용 앱 내부 WireGuard
+프록시를 추가한 **비공식 실험 배포판**입니다. MorpheApp 또는 Proton의 공식 제품이 아닙니다.
+공식 안정판 커밋 `44031c561ea048c8f196877f30a49c13bfd6afb6`을 기존 커스텀
+브랜치에 병합하여 해당 릴리스의 다른 패치와 수정 사항을 포함합니다. v2.1.5의
+WireGuard 엔진·프로필 저장 형식·내부 설정 화면의 언어 수정·8개 언어 번역은 유지합니다.
+이후의 미출시 upstream dev 변경은 포함하지 않습니다.
 
 관리자는 v2.1.1을 실제 Android 기기에서 잘 사용했다고 확인했습니다(2026-11-07).
-이 경험과 v2.1.5 자동화 검증은 구분합니다. 실제 YouTube/Music 앱의 UI 확인, 서버 handshake, 재생, DNS 경로 및
+이 경험과 v2.2.0 자동화 검증은 구분합니다. 실제 YouTube/Music 앱의 UI 확인, 서버 handshake, 재생, DNS 경로 및
 Wi-Fi/모바일 전환은 독립된 화면 하네스 검증과 구분하며 새로 실행한 것으로
-간주하지 않습니다. [이번 변경 및 검증 기록](docs/wireguard-i18n-2.1.5.md)과
+간주하지 않습니다. [이번 변경 및 검증 기록](docs/wireguard-upstream-2.2.0.md)과
 [기기 검증 절차](docs/wireguard-device-acceptance.md)를 참고하세요.
 
-## v2.1.5 변경
+**v2.2.0 주의:** YouTube 21.30.216/21.45.82의 전체 기본 선택 검증에서
+`Feed card layout` fingerprint 오류를 관측했습니다. 공식 번들도 같은
+21.30.216 입력에서 동일하게 실패했습니다. 해당 앱 패치 시 이 패치를 명시적으로
+해제하세요. 공식 패치 목록과 기본 선택 값은 임의로 변경하지 않습니다.
+WireGuard만 선택한 검증 및 별도 선택 조합의 결과는 위 검증 기록에 구분합니다.
+
+## v2.2.0 변경
+
+- 공식 v2.2.0의 전체 패치·오류 수정·호환 버전 정보를 반영합니다.
+- 공식 공통 라이브러리 `2.2.0-dev.3`의 정확한 소스 커밋을 고정합니다.
+- WireGuard 전송 구조와 비활성화 기본값은 유지하며, Music의 갱신된 실험 버전을
+  메타데이터 검사에 반영합니다. 선언된 버전과 실제 APK 검증 결과는 별도로 기록합니다.
+
+## 유지된 v2.1.5 변경
 
 - 진입 메뉴와 내부 화면의 언어가 달라질 수 있던 문자열 조회 경로를 수정합니다.
   내부 제목·설정 행·상태·대화상자·토스트는 현재 화면의 언어 컨텍스트를 사용하며
@@ -63,8 +77,8 @@ TCP/IP 스택과 공식 `wireguard-go`를 통해 WireGuard 서버로 전달합�
 
 | 항목 | 범위 |
 | --- | --- |
-| YouTube | 기반 버전의 선언된 대상 중 20.47.62 이상; 더 오래된 버전은 WireGuard 설치를 건너뜀 |
-| YouTube Music | 9.15.51 / 9.20.53 / 9.30.53; 실험 9.42.52 / 9.43.51 / 9.44.52 |
+| YouTube | v2.2.0의 선언된 대상 중 20.47.62 이상; 더 오래된 버전은 WireGuard 설치를 건너뜀 |
+| YouTube Music | 9.15.51 / 9.20.53 / 9.30.53; 실험 9.43.51 / 9.44.52 / 9.45.51 |
 | APK ABI | arm64-v8a, x86_64; 32비트 ABI를 포함한 APK와 root mount 설치 미지원 |
 | 프로필 | 단일 Interface/Peer, UTF-8, 최대 64 KiB |
 | Endpoint 및 DNS | 숫자 IP; DNS가 AllowedIPs 및 인터페이스 주소 계열과 일치해야 함 |
@@ -103,11 +117,11 @@ WebView, Cast, GmsCore 및 별도 프로세스는 추가 검증 대상입니다.
 네이티브 payload는 Gradle의 `processResources` 전에 소스에서 자동으로 만듭니다.
 Go 1.26.10, Android NDK 28.2.13676358, API 26이 필요합니다. 산출물은
 `native/wireguard/build/android/<abi>/libmorphewireguard.so`와
-`patches/build/libs/patches-2.1.5.mpp`입니다.
+`patches/build/libs/patches-2.2.0.mpp`입니다.
 
 최종 번들 생성 뒤 JVM/Android DEX 기본 선택을 모두 확인합니다.
 `scripts/set-wireguard-defaults.py verify`는 검사용으로만 사용할 수 있습니다.
-역사적인 v2.1.2 재패키징용 `repair`는 v2.1.5 빌드 경로가 아닙니다.
+역사적인 v2.1.2 재패키징용 `repair`는 v2.2.0 빌드 경로가 아닙니다.
 
 [네이티브 설명](native/wireguard/README.md)에 프로필 문법, Go/JNI 테스트 및
 실패 정책을, [기기 체크리스트](docs/wireguard-device-acceptance.md)에 **예상 결과**와

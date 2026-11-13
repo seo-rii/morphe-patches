@@ -1,9 +1,10 @@
 # Building the unofficial WireGuard bundle from source
 
-The v2.1.5 source retains Morphe Patches v2.1.0 at
-`8fa2c7a1a832498de8f179748998a3ca87e198eb`. Only the WireGuard maintenance
-changes from the contribution branch are backported. Existing unrelated patch
-sources and their dependency declarations are preserved.
+The v2.2.0 source merges the official stable Morphe Patches v2.2.0 at
+`44031c561ea048c8f196877f30a49c13bfd6afb6`. The existing custom WireGuard implementation and localization fixes are retained.
+All patches and fixes from that stable base are included. The public library pin
+matches the official `2.2.0-dev.3` dependency; later unreleased patch commits are
+not included.
 
 Both native ABIs, Java/Kotlin extensions, and the Android patch DEX are built
 from source. The build does not repair a previous release archive or modify
@@ -42,7 +43,7 @@ The four public build inputs are pinned as follows:
 | Directory | Repository | Commit |
 | --- | --- | --- |
 | morphe-patches-gradle-plugin | MorpheApp/morphe-patches-gradle-plugin | 5b7e4619931a8c78b7858e598e002222d37021b9 |
-| morphe-patches-library | MorpheApp/morphe-patches-library | 11f8c7e4d9dd64e18b0594d2c7cbf09176a65327 |
+| morphe-patches-library | MorpheApp/morphe-patches-library | 538d9a6574cbacb4ca66d8b687c44d93b2d8d470 |
 | morphe-patcher | MorpheApp/morphe-patcher | d19545e8505e0329cc640723cb8ff91eddd3cd05 |
 | ARSCLib | MorpheApp/ARSCLib | 675bed2de397097400ba6f0c808e28005ae5aa53 |
 
@@ -119,7 +120,7 @@ rebuilding the extracted ZIP on another machine.
 Use actual paths for the bundle and installed Android SDK/NDK:
 
 ```sh
-wireguard_bundle=patches/build/libs/patches-2.1.5.mpp
+wireguard_bundle=patches/build/libs/patches-2.2.0.mpp
 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 python3 scripts/verify-wireguard-bundle.py "$wireguard_bundle" \
   --dexdump "$ANDROID_HOME/build-tools/36.0.0/dexdump"
@@ -145,4 +146,4 @@ checks use [the acceptance checklist](wireguard-device-acceptance.md).
 The checksums for the published release are in `RELEASE-SHA256SUMS.txt` in the
 custom repository/release. Byte equality across other operating systems or NDK
 host packages is not claimed. Do not run the historical artifact `repair`
-subcommand to create v2.1.5; all release inputs come from this source build.
+subcommand to create v2.2.0; all release inputs come from this source build.
