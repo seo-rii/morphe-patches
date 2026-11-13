@@ -52,7 +52,7 @@ public final class WireGuardBundleSmoke {
                 .getCompatibility().get(0);
         Set<String> musicVersions = new HashSet<>();
         music.getTargets().forEach(target -> musicVersions.add(target.getVersion()));
-        if (!musicVersions.equals(Set.of("9.15.51", "9.20.53", "9.30.53", "9.42.52", "9.43.51", "9.44.52"))) {
+        if (!musicVersions.equals(Set.of("9.15.51", "9.20.53", "9.30.53", "9.43.51", "9.44.52", "9.45.51"))) {
             throw new AssertionError("Unexpected Music compatibility targets: " + musicVersions);
         }
         System.out.println("PASS real Morphe JAR loader: " + patches.size() + " patches discovered");

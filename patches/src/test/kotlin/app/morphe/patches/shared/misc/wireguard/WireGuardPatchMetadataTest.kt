@@ -29,7 +29,7 @@ class WireGuardPatchMetadataTest {
         assertEquals("com.google.android.apps.youtube.music", music.packageName)
         assertEquals(setOf("9.15.51", "9.20.53", "9.30.53"),
             music.targets.filterNot { it.isExperimental }.map { it.version }.toSet())
-        assertEquals(setOf("9.42.52", "9.43.51", "9.44.52"),
+        assertEquals(setOf("9.43.51", "9.44.52", "9.45.51"),
             music.targets.filter { it.isExperimental }.map { it.version }.toSet())
         assertEquals(setOf(26), music.targets.map { it.minSdk }.toSet())
     }
